@@ -1,8 +1,8 @@
-use cambio_torrefaction::Styling;
+use cambio_torrefaction::App;
 
 fn main() -> iced::Result {
-    iced::application("Iced Test", Styling::update, Styling::view)
-        .theme(Styling::theme)
+    iced::application("Cambio Torréfaction", App::update, App::view)
+        .theme(App::theme)
         .centered()
-        .run()
+        .run_with(App::new)
 }

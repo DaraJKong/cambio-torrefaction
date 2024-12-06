@@ -2,16 +2,10 @@ use iced::widget::{
     button, center, checkbox, column, horizontal_rule, pick_list, progress_bar, row, scrollable,
     slider, text, text_input, toggler, vertical_rule, vertical_space,
 };
-use iced::{Center, Element, Fill, Theme};
-
-pub fn main() -> iced::Result {
-    iced::application("Styling - Iced", Styling::update, Styling::view)
-        .theme(Styling::theme)
-        .run()
-}
+use iced::{Center, Element, Fill, Task, Theme};
 
 #[derive(Default)]
-pub struct Styling {
+pub struct App {
     theme: Theme,
     input_value: String,
     slider_value: f32,
@@ -29,7 +23,17 @@ pub enum Message {
     TogglerToggled(bool),
 }
 
-impl Styling {
+impl App {
+    pub fn new() -> (Self, Task<Message>) {
+        (
+            Self {
+                theme: Theme::TokyoNight,
+                ..Default::default()
+            },
+            Task::none(),
+        )
+    }
+
     pub fn update(&mut self, message: Message) {
         match message {
             Message::ThemeChanged(theme) => {
