@@ -1,111 +1,97 @@
-use iced::widget::{
-    button, center, checkbox, column, horizontal_rule, pick_list, progress_bar, row, scrollable,
-    slider, text, text_input, toggler, vertical_rule, vertical_space,
+use iced::{
+    widget::{button, column, row, vertical_rule},
+    Element, Theme,
 };
-use iced::{Center, Element, Fill, Task, Theme};
 
-#[derive(Default)]
+mod icons;
+mod recipe;
+mod settings;
+mod sidebar;
+
+use recipe::Recipe;
+use settings::Settings;
+use sidebar::{icon_tab, sidebar, Sidebar};
+
 pub struct App {
-    theme: Theme,
-    input_value: String,
-    slider_value: f32,
-    checkbox_value: bool,
-    toggler_value: bool,
+    screen: Screen,
+    sidebar: Sidebar,
+    recipe: Recipe,
+    settings: Settings,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        App {
+            screen: Screen::default(),
+            sidebar: sidebar(vec![icon_tab('\u{E801}'), icon_tab('\u{E800}')], 0),
+            recipe: Recipe::default(),
+            settings: Settings::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Screen {
+    Recipe,
+    Settings,
+}
+
+impl Default for Screen {
+    fn default() -> Self {
+        Screen::Recipe
+    }
+}
+
+impl TryFrom<usize> for Screen {
+    type Error = ();
+
+    fn try_from(v: usize) -> Result<Self, Self::Error> {
+        match v {
+            x if x == Screen::Recipe as usize => Ok(Screen::Recipe),
+            x if x == Screen::Settings as usize => Ok(Screen::Settings),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    ThemeChanged(Theme),
-    InputChanged(String),
-    ButtonPressed,
-    SliderChanged(f32),
-    CheckboxToggled(bool),
-    TogglerToggled(bool),
+    ScreenSelected(Screen),
+    Sidebar(sidebar::Message),
+    Recipe(recipe::Message),
+    Settings(settings::Message),
 }
 
 impl App {
-    pub fn new() -> (Self, Task<Message>) {
-        (
-            Self {
-                theme: Theme::TokyoNight,
-                ..Default::default()
-            },
-            Task::none(),
-        )
-    }
-
-    pub fn update(&mut self, message: Message) {
+    pub fn update(app: &mut App, message: Message) {
         match message {
-            Message::ThemeChanged(theme) => {
-                self.theme = theme;
+            Message::ScreenSelected(selected) => app.screen = selected,
+            Message::Sidebar(message) => {
+                match message {
+                    sidebar::Message::TabSelected(id) => {
+                        app.screen = id.try_into().unwrap();
+                    }
+                }
+
+                app.sidebar.update(message);
             }
-            Message::InputChanged(value) => self.input_value = value,
-            Message::ButtonPressed => {}
-            Message::SliderChanged(value) => self.slider_value = value,
-            Message::CheckboxToggled(value) => self.checkbox_value = value,
-            Message::TogglerToggled(value) => self.toggler_value = value,
+            Message::Recipe(message) => app.recipe.update(message),
+            Message::Settings(message) => app.settings.update(message),
         }
     }
 
-    pub fn view(&self) -> Element<Message> {
-        let choose_theme = column![
-            text("Theme:"),
-            pick_list(Theme::ALL, Some(&self.theme), Message::ThemeChanged).width(Fill),
-        ]
-        .spacing(10);
+    pub fn view(app: &App) -> Element<Message> {
+        let sidebar = app.sidebar.view().map(Message::Sidebar);
 
-        let text_input = text_input("Type something...", &self.input_value)
-            .on_input(Message::InputChanged)
-            .padding(10)
-            .size(20);
+        let screen = match &app.screen {
+            Screen::Recipe => app.recipe.view().map(Message::Recipe),
+            Screen::Settings => app.settings.view().map(Message::Settings),
+        };
 
-        let button = button("Submit")
-            .padding(10)
-            .on_press(Message::ButtonPressed);
-
-        let slider = slider(0.0..=100.0, self.slider_value, Message::SliderChanged);
-
-        let progress_bar = progress_bar(0.0..=100.0, self.slider_value);
-
-        let scrollable = scrollable(column![
-            "Scroll me!",
-            vertical_space().height(800),
-            "You did it!"
-        ])
-        .width(Fill)
-        .height(100);
-
-        let checkbox =
-            checkbox("Check me!", self.checkbox_value).on_toggle(Message::CheckboxToggled);
-
-        let toggler = toggler(self.toggler_value)
-            .label("Toggle me!")
-            .on_toggle(Message::TogglerToggled)
-            .spacing(10);
-
-        let content = column![
-            choose_theme,
-            horizontal_rule(38),
-            row![text_input, button].spacing(10).align_y(Center),
-            slider,
-            progress_bar,
-            row![
-                scrollable,
-                vertical_rule(38),
-                column![checkbox, toggler].spacing(20)
-            ]
-            .spacing(10)
-            .height(100)
-            .align_y(Center),
-        ]
-        .spacing(20)
-        .padding(20)
-        .max_width(600);
-
-        center(content).into()
+        row![sidebar, vertical_rule(1), screen].into()
     }
 
-    pub fn theme(&self) -> Theme {
-        self.theme.clone()
+    pub fn theme(app: &App) -> Theme {
+        app.settings.theme()
     }
 }
