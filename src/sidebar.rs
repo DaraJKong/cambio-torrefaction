@@ -75,7 +75,7 @@ impl Sidebar {
 
     pub fn view(&self) -> Element<Message> {
         let handle =
-            svg::Handle::from_path(format!("{}/resources/logo.svg", env!("CARGO_MANIFEST_DIR")));
+            svg::Handle::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/logo.svg"));
 
         column![
             container(svg(handle)).padding(12),
