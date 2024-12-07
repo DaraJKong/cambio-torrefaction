@@ -1,5 +1,5 @@
 use iced::{
-    widget::{button, column, row, vertical_rule},
+    widget::{row, vertical_rule},
     Element, Theme,
 };
 

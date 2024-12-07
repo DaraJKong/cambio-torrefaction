@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="1024"
+   height="1024"
+   viewBox="0 0 270.93333 270.93333"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <g
+     id="layer1">
+    <g
+       id="g30"
+       transform="matrix(11.528884,0,0,11.528884,-81.992861,-60.904337)">
+      <path
+         id="path27"
+         style="opacity:1;fill:#d3a1d7;fill-opacity:1;stroke:none;stroke-width:0.0291326;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+         d="M 18.887797,5.3286602 A 13.546666,13.546666 0 0 0 12.086765,17.040607 13.546666,13.546666 0 0 0 18.860098,28.737257 13.546666,13.546666 0 0 0 25.633432,17.040607 13.546666,13.546666 0 0 0 18.887797,5.3286602 Z" />
+      <path
+         id="path28"
+         style="opacity:1;fill:#ca93cd;fill-opacity:1;stroke:none;stroke-width:0.0291326;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+         d="M 18.888004,5.3288662 A 67.73333,67.73333 0 0 1 15.61947,26.098658 13.546666,13.546666 0 0 0 18.860099,28.737257 13.546666,13.546666 0 0 0 22.280045,25.909006 67.73333,67.73333 0 0 1 18.888004,5.3288662 Z" />
+      <path
+         id="path29"
+         style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#30bfbf;fill-opacity:1;stroke:none;stroke-width:0.0291326;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1"
+         d="M 7.6755423,9.3578014 A 16.933332,16.933332 0 0 0 9.6009843,21.166667 16.933332,16.933332 0 0 0 18.860099,28.737257 16.933332,16.933332 0 0 0 16.933333,16.933333 16.933332,16.933332 0 0 0 7.6755423,9.3578014 Z" />
+      <path
+         id="path30"
+         style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#36c9c9;fill-opacity:1;stroke:none;stroke-width:0.0291326;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1"
+         d="m 30.050921,9.3614195 a 16.933332,16.933332 0 0 0 -9.264057,7.5719145 16.933332,16.933332 0 0 0 -1.926765,11.803923 16.933332,16.933332 0 0 0 9.259115,-7.57059 16.933332,16.933332 0 0 0 1.931707,-11.8052475 z" />
+    </g>
+  </g>
+</svg>

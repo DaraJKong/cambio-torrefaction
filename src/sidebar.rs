@@ -1,6 +1,6 @@
 use iced::{
-    widget::{button, column, row, rule, text, vertical_rule},
-    Alignment, Background, Color, Element, Length,
+    widget::{button, column, container, row, rule, svg, text, vertical_rule},
+    Color, Element,
 };
 
 use crate::icons::icon;
@@ -74,12 +74,19 @@ impl Sidebar {
     }
 
     pub fn view(&self) -> Element<Message> {
-        column(
-            self.tabs
-                .iter()
-                .enumerate()
-                .map(|(id, tab)| tab.view(id, self.selected)),
-        )
+        let handle =
+            svg::Handle::from_path(format!("{}/resources/logo.svg", env!("CARGO_MANIFEST_DIR")));
+
+        column![
+            container(svg(handle)).padding(12),
+            column(
+                self.tabs
+                    .iter()
+                    .enumerate()
+                    .map(|(id, tab)| tab.view(id, self.selected)),
+            )
+        ]
+        .width(67)
         .into()
     }
 }
