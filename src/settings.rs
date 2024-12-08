@@ -26,6 +26,7 @@ impl Settings {
         match message {
             Message::ThemeSelected(theme) => {
                 self.preferences.theme = theme;
+                self.preferences.save().ok();
             }
         }
     }

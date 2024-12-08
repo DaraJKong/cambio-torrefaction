@@ -1,11 +1,6 @@
 use directories::ProjectDirs;
 use once_cell::sync::Lazy;
-use std::{
-    error::Error,
-    fs,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{error::Error, fs, path::PathBuf, sync::Arc};
 
 use iced::{theme::Custom, Theme};
 use serde::{Deserialize, Serialize};
@@ -57,19 +52,28 @@ impl Default for Preferences {
 }
 
 impl Preferences {
-    pub fn load() -> Result<Self, Box<dyn Error>> {
+    fn config_file() -> PathBuf {
         let mut path = PROJECT_DIRS.preference_dir().join("_").to_path_buf();
         path.set_file_name("config.toml");
+        path
+    }
 
-        if let Ok(string) = fs::read_to_string(path.clone()) {
+    pub fn load() -> Result<Self, Box<dyn Error>> {
+        let preferences = Preferences::default();
+        if let Ok(string) = fs::read_to_string(Self::config_file()) {
             Ok(toml::from_str(&string)?)
         } else {
-            let preferences = Preferences::default();
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(path, toml::to_string(&preferences)?)?;
+            preferences.save()?;
             Ok(preferences)
         }
+    }
+
+    pub fn save(&self) -> Result<(), Box<dyn Error>> {
+        let path = Self::config_file();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, toml::to_string(&self)?)?;
+        Ok(())
     }
 }
