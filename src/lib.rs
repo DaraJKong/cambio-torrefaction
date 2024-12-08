@@ -1,4 +1,9 @@
-use iced::{widget::row, Element, Theme};
+use iced::{
+    event,
+    keyboard::{self, key},
+    widget::{self, row},
+    Element, Event, Subscription, Task, Theme,
+};
 
 mod icons;
 mod recipe;
@@ -57,12 +62,21 @@ pub enum Message {
     Sidebar(sidebar::Message),
     Recipe(recipe::Message),
     Settings(settings::Message),
+    Event(Event),
 }
 
 impl App {
-    pub fn update(app: &mut App, message: Message) {
+    pub fn subscription(&self) -> Subscription<Message> {
+        event::listen().map(Message::Event)
+    }
+
+    pub fn update(app: &mut App, message: Message) -> Task<Message> {
         match message {
-            Message::ScreenSelected(selected) => app.screen = selected,
+            Message::ScreenSelected(selected) => {
+                app.screen = selected;
+
+                Task::none()
+            }
             Message::Sidebar(message) => {
                 match message {
                     sidebar::Message::TabSelected(id) => {
@@ -71,9 +85,31 @@ impl App {
                 }
 
                 app.sidebar.update(message);
+
+                Task::none()
             }
-            Message::Recipe(message) => app.recipe.update(message),
-            Message::Settings(message) => app.settings.update(message),
+            Message::Recipe(message) => {
+                app.recipe.update(message);
+                Task::none()
+            }
+            Message::Settings(message) => {
+                app.settings.update(message);
+                Task::none()
+            }
+            Message::Event(event) => match event {
+                Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(key::Named::Tab),
+                    modifiers,
+                    ..
+                }) => {
+                    if modifiers.shift() {
+                        widget::focus_previous()
+                    } else {
+                        widget::focus_next()
+                    }
+                }
+                _ => Task::none(),
+            },
         }
     }
 
