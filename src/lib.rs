@@ -1,7 +1,4 @@
-use iced::{
-    widget::{row, vertical_rule},
-    Element, Theme,
-};
+use iced::{widget::row, Element, Theme};
 
 mod icons;
 mod recipe;
@@ -10,7 +7,7 @@ mod sidebar;
 
 use recipe::Recipe;
 use settings::Settings;
-use sidebar::{icon_tab, sidebar, Sidebar};
+use sidebar::{Sidebar, Tab};
 
 pub struct App {
     screen: Screen,
@@ -23,7 +20,7 @@ impl Default for App {
     fn default() -> Self {
         App {
             screen: Screen::default(),
-            sidebar: sidebar(vec![icon_tab('\u{E801}'), icon_tab('\u{E800}')], 0),
+            sidebar: Sidebar::new(vec![Tab::icon('\u{E801}'), Tab::icon('\u{E800}')], 0),
             recipe: Recipe::default(),
             settings: Settings::default(),
         }
@@ -88,7 +85,7 @@ impl App {
             Screen::Settings => app.settings.view().map(Message::Settings),
         };
 
-        row![sidebar, vertical_rule(1), screen].into()
+        row![sidebar, screen].into()
     }
 
     pub fn theme(app: &App) -> Theme {
