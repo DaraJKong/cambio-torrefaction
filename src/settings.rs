@@ -1,17 +1,11 @@
 use iced::widget::{center, column, pick_list, text};
 use iced::{Element, Fill, Theme};
 
-#[derive(Clone, Debug)]
-pub struct Settings {
-    theme: Theme,
-}
+use crate::preferences::Preferences;
 
-impl Default for Settings {
-    fn default() -> Self {
-        Settings {
-            theme: Theme::TokyoNight,
-        }
-    }
+#[derive(Clone, Debug, Default)]
+pub struct Settings {
+    preferences: Preferences,
 }
 
 #[derive(Debug, Clone)]
@@ -20,14 +14,18 @@ pub enum Message {
 }
 
 impl Settings {
+    pub fn new(preferences: Preferences) -> Self {
+        Settings { preferences }
+    }
+
     pub fn theme(&self) -> Theme {
-        self.theme.clone()
+        self.preferences.theme.clone()
     }
 
     pub fn update(&mut self, message: Message) {
         match message {
             Message::ThemeSelected(theme) => {
-                self.theme = theme;
+                self.preferences.theme = theme;
             }
         }
     }
@@ -35,7 +33,12 @@ impl Settings {
     pub fn view(&self) -> Element<Message> {
         let choose_theme = column![
             text("Theme:"),
-            pick_list(Theme::ALL, Some(&self.theme), Message::ThemeSelected).width(Fill),
+            pick_list(
+                Theme::ALL,
+                Some(&self.preferences.theme),
+                Message::ThemeSelected
+            )
+            .width(Fill),
         ]
         .spacing(10);
 

@@ -18,5 +18,5 @@ fn main() -> iced::Result {
         })
         .centered()
         .antialiasing(true)
-        .run()
+        .run_with(App::init)
 }

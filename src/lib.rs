@@ -6,10 +6,12 @@ use iced::{
 };
 
 mod icons;
+mod preferences;
 mod recipe;
 mod settings;
 mod sidebar;
 
+use preferences::Preferences;
 use recipe::Recipe;
 use settings::Settings;
 use sidebar::{Sidebar, Tab};
@@ -66,6 +68,18 @@ pub enum Message {
 }
 
 impl App {
+    pub fn init() -> (App, Task<Message>) {
+        let preferences = Preferences::load();
+
+        (
+            App {
+                settings: Settings::new(preferences.unwrap()),
+                ..Default::default()
+            },
+            Task::none(),
+        )
+    }
+
     pub fn subscription(&self) -> Subscription<Message> {
         event::listen().map(Message::Event)
     }
