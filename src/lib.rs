@@ -5,6 +5,7 @@ use iced::{
     Element, Event, Subscription, Task, Theme,
 };
 
+mod data;
 mod icons;
 mod preferences;
 mod recipe;
