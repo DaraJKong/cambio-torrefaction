@@ -1,3 +1,8 @@
+use iced::{
+    border,
+    widget::{container, row, text},
+    Alignment, Background, Element, Theme,
+};
 use once_cell::sync::Lazy;
 use std::{fmt, time::Duration};
 
@@ -17,18 +22,29 @@ impl Recipe {
     pub fn name(&self) -> &String {
         &self.name
     }
-}
 
-#[derive(Clone, Debug)]
-pub struct Step {
-    checkpoint: Checkpoint,
-    step_type: StepType,
+    pub fn steps(&self) -> &Vec<Step> {
+        &self.steps
+    }
 }
 
 #[derive(Clone, Debug)]
 pub enum Checkpoint {
     Time(Duration),
     Temp(f32),
+}
+
+impl Checkpoint {
+    pub fn view<'a, Message>(&self) -> Element<'a, Message> {
+        match self {
+            Checkpoint::Time(duration) => {
+                let secs = duration.as_secs_f32();
+                text(format!("{}:{}", (secs / 60.).floor(), secs % 60.))
+            }
+            Checkpoint::Temp(temp) => text(format!("{} °C", temp)),
+        }
+        .into()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -42,6 +58,81 @@ pub enum StepType {
     DeltaTempOnOffGas(f32),
     SwitchCooling(bool),
     SwitchMixing(bool),
+}
+
+impl StepType {
+    pub fn view<'a, Message: 'a>(&'a self) -> Element<'a, Message> {
+        match self {
+            StepType::Start => text("Start").style(text::success).into(),
+            StepType::End => text("End").style(text::danger).into(),
+            StepType::AdjustAirflow(airflow) => container(text(format!("{}", airflow)).center())
+                .padding([2.5, 10.])
+                .style(|theme: &Theme| {
+                    container::background(Background::Color(
+                        theme.extended_palette().secondary.base.color,
+                    ))
+                    .border(border::rounded(100))
+                })
+                .into(),
+            StepType::SwitchGas(gas) => {
+                let label = if *gas { "ON" } else { "OFF" };
+                container(text(label).center())
+                    .padding([2.5, 10.])
+                    .style(|theme: &Theme| {
+                        let style = container::background(Background::Color(if *gas {
+                            theme.palette().success
+                        } else {
+                            theme.palette().danger
+                        }));
+                        style
+                            .border(border::rounded(100))
+                            .color(theme.palette().background)
+                    })
+                    .into()
+            }
+            StepType::AdjustGas(gas) => text(format!("{}", gas)).style(text::primary).into(),
+            StepType::DurationOnOffGas(duration) => {
+                text(format!("o/o {} secs", duration.as_secs()))
+                    .style(text::primary)
+                    .into()
+            }
+            StepType::DeltaTempOnOffGas(delta) => text(format!("o/o {} °C", delta))
+                .style(text::primary)
+                .into(),
+            StepType::SwitchCooling(cooling) => {
+                let label = if *cooling {
+                    "Turn ON the cooling"
+                } else {
+                    "Turn OFF the cooling"
+                };
+                text(label).style(text::secondary).into()
+            }
+            StepType::SwitchMixing(mixing) => {
+                let label = if *mixing {
+                    "Turn ON the mixing"
+                } else {
+                    "Turn OFF the mixing"
+                };
+                text(label).style(text::secondary).into()
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Step {
+    checkpoint: Checkpoint,
+    step_type: StepType,
+}
+
+impl Step {
+    pub fn view<'a, Message: 'a>(&'a self) -> Element<'a, Message> {
+        row![self.checkpoint.view(), self.step_type.view()]
+            .height(35)
+            .align_y(Alignment::Center)
+            .spacing(20)
+            .into()
+    }
 }
 
 pub fn start(temp: f32) -> Step {

@@ -1,5 +1,5 @@
 use iced::{
-    widget::{column, combo_box, container, row, text},
+    widget::{column, combo_box, container, row, scrollable, text},
     Element,
     Length::Fill,
 };
@@ -41,12 +41,22 @@ impl Recipe {
             Message::RecipeSelected,
         )];
 
-        let recipe = text(
+        let title = text(
             self.selected
                 .as_ref()
                 .map_or("No recipe selected", |recipe| &recipe.name()),
         )
         .size(30);
+
+        let steps = scrollable(
+            column(self.selected.as_ref().map_or(Vec::new(), |recipe| {
+                recipe.steps().iter().map(|step| step.view()).collect()
+            }))
+            .spacing(5),
+        )
+        .width(Fill);
+
+        let recipe = column![title, steps].spacing(20);
 
         container(column![header, recipe].max_width(800).spacing(20))
             .center_x(Fill)
