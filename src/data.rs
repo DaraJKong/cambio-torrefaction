@@ -163,10 +163,10 @@ pub fn switch_gas(temp: f32, to: bool) -> Step {
     }
 }
 
-pub fn on_off(temp: f32, time: u64) -> Step {
+pub fn on_off(temp: f32, secs: u64) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
-        step_type: StepType::DurationOnOffGas(Duration::from_secs(time)),
+        step_type: StepType::DurationOnOffGas(Duration::from_secs(secs)),
     }
 }
 
@@ -187,6 +187,62 @@ pub fn switch_cooling(temp: f32, to: bool) -> Step {
 pub fn switch_mixing(temp: f32, to: bool) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
+        step_type: StepType::SwitchMixing(to),
+    }
+}
+
+pub fn t_start(time: (u64, u64)) -> Step {
+    Step {
+        checkpoint: Checkpoint::Time(Duration::from_secs(time.0 * 60 + time.1)),
+        step_type: StepType::Start,
+    }
+}
+
+pub fn t_end(time: (u64, u64)) -> Step {
+    Step {
+        checkpoint: Checkpoint::Time(Duration::from_secs(time.0 * 60 + time.1)),
+        step_type: StepType::End,
+    }
+}
+
+pub fn t_adjust_airflow(time: (u64, u64), airflow: f32) -> Step {
+    Step {
+        checkpoint: Checkpoint::Time(Duration::from_secs(time.0 * 60 + time.1)),
+        step_type: StepType::AdjustAirflow(airflow),
+    }
+}
+
+pub fn t_switch_gas(time: (u64, u64), to: bool) -> Step {
+    Step {
+        checkpoint: Checkpoint::Time(Duration::from_secs(time.0 * 60 + time.1)),
+        step_type: StepType::SwitchGas(to),
+    }
+}
+
+pub fn t_on_off(time: (u64, u64), secs: u64) -> Step {
+    Step {
+        checkpoint: Checkpoint::Time(Duration::from_secs(time.0 * 60 + time.1)),
+        step_type: StepType::DurationOnOffGas(Duration::from_secs(secs)),
+    }
+}
+
+pub fn t_temp_on_off(time: (u64, u64), delta: f32) -> Step {
+    Step {
+        checkpoint: Checkpoint::Time(Duration::from_secs(time.0 * 60 + time.1)),
+        step_type: StepType::DeltaTempOnOffGas(delta),
+    }
+}
+
+pub fn t_switch_cooling(time: (u64, u64), to: bool) -> Step {
+    Step {
+        checkpoint: Checkpoint::Time(Duration::from_secs(time.0 * 60 + time.1)),
+        step_type: StepType::SwitchCooling(to),
+    }
+}
+
+pub fn t_switch_mixing(time: (u64, u64), to: bool) -> Step {
+    Step {
+        checkpoint: Checkpoint::Time(Duration::from_secs(time.0 * 60 + time.1)),
         step_type: StepType::SwitchMixing(to),
     }
 }
@@ -220,5 +276,35 @@ pub static DUMB_RECIPE: Lazy<Recipe> = Lazy::new(|| Recipe {
         on_off(222., 2),
         on_off(224., 0),
         end(226.),
+    ],
+});
+
+pub static TIME_RECIPE: Lazy<Recipe> = Lazy::new(|| Recipe {
+    name: "Guatemala Natural".to_string(),
+    steps: vec![
+        start(190.),
+        adjust_airflow(100., 0.5),
+        t_switch_cooling((2, 10), false),
+        t_switch_mixing((3, 15), false),
+        on_off(160., 0),
+        on_off(170., 0),
+        on_off(175., 0),
+        on_off(180., 0),
+        on_off(182., 2),
+        on_off(185., 3),
+        switch_gas(187., false),
+        switch_gas(189., true),
+        switch_gas(192., false),
+        switch_gas(193., true),
+        on_off(195., 2),
+        switch_gas(208., false),
+        on_off(209., 3),
+        on_off(210., 3),
+        on_off(212., 2),
+        on_off(214., 2),
+        on_off(216., 2),
+        switch_cooling(216.5, true),
+        switch_mixing(216.5, true),
+        t_end((12, 38)),
     ],
 });

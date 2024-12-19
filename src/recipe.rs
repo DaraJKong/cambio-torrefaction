@@ -15,7 +15,10 @@ pub struct Recipe {
 impl Recipe {
     pub fn new() -> Self {
         Recipe {
-            recipes: combo_box::State::new(vec![data::DUMB_RECIPE.clone()]),
+            recipes: combo_box::State::new(vec![
+                data::DUMB_RECIPE.clone(),
+                data::TIME_RECIPE.clone(),
+            ]),
             selected: None,
         }
     }
