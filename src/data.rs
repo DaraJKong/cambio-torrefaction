@@ -1,22 +1,37 @@
-use std::time::Duration;
-
 use once_cell::sync::Lazy;
+use std::{fmt, time::Duration};
 
+#[derive(Clone, Debug)]
 pub struct Recipe {
     name: String,
     steps: Vec<Step>,
 }
 
+impl fmt::Display for Recipe {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl Recipe {
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Step {
     checkpoint: Checkpoint,
     step_type: StepType,
 }
 
+#[derive(Clone, Debug)]
 pub enum Checkpoint {
     Time(Duration),
     Temp(f32),
 }
 
+#[derive(Clone, Debug)]
 pub enum StepType {
     Start,
     End,
@@ -29,63 +44,63 @@ pub enum StepType {
     SwitchMixing(bool),
 }
 
-fn start(temp: f32) -> Step {
+pub fn start(temp: f32) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
         step_type: StepType::Start,
     }
 }
 
-fn end(temp: f32) -> Step {
+pub fn end(temp: f32) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
         step_type: StepType::End,
     }
 }
 
-fn adjust_airflow(temp: f32, airflow: f32) -> Step {
+pub fn adjust_airflow(temp: f32, airflow: f32) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
         step_type: StepType::AdjustAirflow(airflow),
     }
 }
 
-fn switch_gas(temp: f32, to: bool) -> Step {
+pub fn switch_gas(temp: f32, to: bool) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
         step_type: StepType::SwitchGas(to),
     }
 }
 
-fn on_off(temp: f32, time: u64) -> Step {
+pub fn on_off(temp: f32, time: u64) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
         step_type: StepType::DurationOnOffGas(Duration::from_secs(time)),
     }
 }
 
-fn temp_on_off(temp: f32, delta: f32) -> Step {
+pub fn temp_on_off(temp: f32, delta: f32) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
         step_type: StepType::DeltaTempOnOffGas(delta),
     }
 }
 
-fn switch_cooling(temp: f32, to: bool) -> Step {
+pub fn switch_cooling(temp: f32, to: bool) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
         step_type: StepType::SwitchCooling(to),
     }
 }
 
-fn switch_mixing(temp: f32, to: bool) -> Step {
+pub fn switch_mixing(temp: f32, to: bool) -> Step {
     Step {
         checkpoint: Checkpoint::Temp(temp),
         step_type: StepType::SwitchMixing(to),
     }
 }
 
-pub static DUMP_RECIPE: Lazy<Recipe> = Lazy::new(|| Recipe {
+pub static DUMB_RECIPE: Lazy<Recipe> = Lazy::new(|| Recipe {
     name: "Nicaragua".to_string(),
     steps: vec![
         start(200.),

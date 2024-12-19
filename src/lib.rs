@@ -29,7 +29,7 @@ impl Default for App {
         App {
             screen: Screen::default(),
             sidebar: Sidebar::new(vec![Tab::icon('\u{E801}'), Tab::icon('\u{E800}')], 0),
-            recipe: Recipe::default(),
+            recipe: Recipe::new(),
             settings: Settings::default(),
         }
     }
