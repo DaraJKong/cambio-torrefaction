@@ -13,3 +13,7 @@ pub fn home_icon<'a, Message>() -> Element<'a, Message> {
 pub fn cog_icon<'a, Message>() -> Element<'a, Message> {
     icon('\u{E800}')
 }
+
+pub fn industry_icon<'a, Message>() -> Element<'a, Message> {
+    icon('\u{F275}')
+}

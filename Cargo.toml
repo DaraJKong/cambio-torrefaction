@@ -11,5 +11,6 @@ serde-versioning = "1.0.215"
 toml = "0.8.19"
 sqlx = "0.8.2"
 # open = "5.3.1"
-iced = { version = "0.13.1", features = ["svg", "image"] }
+iced = { git = "https://github.com/iced-rs/iced", features = ["svg", "image"] }
 # iced_aw = { version = "0.11.0", default-features = false }
+phidget = { git = "https://github.com/DaraJKong/phidget-rs.git" }

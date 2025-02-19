@@ -9,11 +9,13 @@ mod data;
 mod icons;
 mod preferences;
 mod recipe;
+mod roasting;
 mod settings;
 mod sidebar;
 
 use preferences::Preferences;
 use recipe::Recipe;
+use roasting::Roasting;
 use settings::Settings;
 use sidebar::{Sidebar, Tab};
 
@@ -21,6 +23,7 @@ pub struct App {
     screen: Screen,
     sidebar: Sidebar,
     recipe: Recipe,
+    roasting: Roasting,
     settings: Settings,
 }
 
@@ -30,6 +33,7 @@ impl Default for App {
             screen: Screen::default(),
             sidebar: Sidebar::new(vec![Tab::icon('\u{E801}'), Tab::icon('\u{E800}')], 0),
             recipe: Recipe::new(),
+            roasting: Roasting::default(),
             settings: Settings::default(),
         }
     }
@@ -38,6 +42,7 @@ impl Default for App {
 #[derive(Clone, Debug)]
 pub enum Screen {
     Recipe,
+    Roasting,
     Settings,
 }
 
@@ -53,6 +58,7 @@ impl TryFrom<usize> for Screen {
     fn try_from(v: usize) -> Result<Self, Self::Error> {
         match v {
             x if x == Screen::Recipe as usize => Ok(Screen::Recipe),
+            x if x == Screen::Roasting as usize => Ok(Screen::Roasting),
             x if x == Screen::Settings as usize => Ok(Screen::Settings),
             _ => Err(()),
         }
@@ -64,6 +70,7 @@ pub enum Message {
     ScreenSelected(Screen),
     Sidebar(sidebar::Message),
     Recipe(recipe::Message),
+    Roasting(roasting::Message),
     Settings(settings::Message),
     Event(Event),
 }
@@ -82,7 +89,10 @@ impl App {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        event::listen().map(Message::Event)
+        Subscription::batch([
+            event::listen().map(Message::Event),
+            Roasting::subscription(&self.roasting).map(Message::Roasting),
+        ])
     }
 
     pub fn update(app: &mut App, message: Message) -> Task<Message> {
@@ -105,6 +115,10 @@ impl App {
             }
             Message::Recipe(message) => {
                 app.recipe.update(message);
+                Task::none()
+            }
+            Message::Roasting(message) => {
+                app.roasting.update(message);
                 Task::none()
             }
             Message::Settings(message) => {
@@ -133,6 +147,7 @@ impl App {
 
         let screen = match &app.screen {
             Screen::Recipe => app.recipe.view().map(Message::Recipe),
+            Screen::Roasting => app.roasting.view().map(Message::Roasting),
             Screen::Settings => app.settings.view().map(Message::Settings),
         };
 
