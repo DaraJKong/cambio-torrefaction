@@ -5,11 +5,11 @@ fn main() -> iced::Result {
     iced::application("Cambio Torréfaction", App::update, App::view)
         .subscription(App::subscription)
         .theme(App::theme)
-        .font(include_bytes!("../fonts/app-icons.ttf"))
+        .font(include_bytes!("../assets/fonts/app-icons.ttf"))
         .window(window::Settings {
             icon: Some(
                 window::icon::from_file_data(
-                    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/icon.ico")),
+                    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icon.ico")),
                     None,
                 )
                 .expect("icon file should be reachable and in ICO file format"),
