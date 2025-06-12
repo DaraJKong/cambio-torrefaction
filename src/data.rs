@@ -1,7 +1,6 @@
 use iced::{
-    border,
+    Alignment, Background, Element, Theme, border,
     widget::{container, row, text},
-    Alignment, Background, Element, Theme,
 };
 use once_cell::sync::Lazy;
 use std::{fmt, time::Duration};

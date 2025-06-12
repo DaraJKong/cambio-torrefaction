@@ -2,7 +2,7 @@ use directories::ProjectDirs;
 use once_cell::sync::Lazy;
 use std::{error::Error, fs, path::PathBuf, sync::Arc};
 
-use iced::{theme::Custom, Theme};
+use iced::{Theme, theme::Custom};
 use serde::{Deserialize, Serialize};
 
 pub static PROJECT_DIRS: Lazy<ProjectDirs> =

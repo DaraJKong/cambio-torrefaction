@@ -1,4 +1,4 @@
-use iced::{widget::text, Element, Font};
+use iced::{Element, Font, widget::text};
 
 pub fn icon<'a, Message>(codepoint: char) -> Element<'a, Message> {
     const ICONS_FONT: Font = Font::with_name("app-icons");

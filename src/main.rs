@@ -2,8 +2,8 @@ use cambio_torrefaction::App;
 use iced::window;
 
 fn main() -> iced::Result {
-    iced::application("Cambio Torréfaction", App::update, App::view)
-        .subscription(App::subscription)
+    iced::application(App::boot, App::update, App::view)
+        .title("Cambio Torréfaction")
         .theme(App::theme)
         .font(include_bytes!("../assets/fonts/app-icons.ttf"))
         .window(window::Settings {
@@ -18,5 +18,5 @@ fn main() -> iced::Result {
         })
         .centered()
         .antialiasing(true)
-        .run_with(App::init)
+        .run()
 }

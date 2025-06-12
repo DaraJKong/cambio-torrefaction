@@ -1,6 +1,6 @@
 use iced::{
-    widget::{button, column, container, horizontal_space, row, rule, svg, text, vertical_rule},
     Color, Element,
+    widget::{button, column, container, horizontal_space, row, rule, svg, text, vertical_rule},
 };
 
 use crate::icons::icon;

@@ -1,7 +1,7 @@
 use iced::{
-    widget::{column, combo_box, container, row, scrollable, text},
     Element,
     Length::Fill,
+    widget::{column, combo_box, container, row, scrollable, text},
 };
 
 use crate::data;

@@ -1,8 +1,8 @@
 use iced::{
-    widget::{center, column, pick_list, text},
     Element,
     Length::Fill,
     Theme,
+    widget::{center, column, pick_list, text},
 };
 
 use crate::preferences::Preferences;

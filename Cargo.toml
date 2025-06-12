@@ -1,16 +1,16 @@
 [package]
 name = "cambio-torrefaction"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-once_cell = "1.20.2"
+once_cell = "1.21.3"
 directories = "6.0.0"
 serde = { version = "1.0.215", features = ["derive"] }
 serde-versioning = "1.0.215"
-toml = "0.8.19"
-sqlx = "0.8.2"
+toml = "0.8.23"
+sqlx = "0.8.6"
 # open = "5.3.1"
-iced = { git = "https://github.com/iced-rs/iced", features = ["svg", "image"] }
+iced = { git = "https://github.com/iced-rs/iced", features = ["tokio", "sipper", "svg", "image"] }
 # iced_aw = { version = "0.11.0", default-features = false }
-phidget = { git = "https://github.com/DaraJKong/phidget-rs.git" }
+phidget = { git = "https://github.com/fpagliughi/phidget-rs" }

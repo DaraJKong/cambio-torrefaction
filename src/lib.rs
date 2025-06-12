@@ -1,8 +1,7 @@
 use iced::{
-    event,
+    Element, Event, Task, Theme,
     keyboard::{self, key},
     widget::{self, row},
-    Element, Event, Subscription, Task, Theme,
 };
 
 mod data;
@@ -10,6 +9,7 @@ mod icons;
 mod preferences;
 mod recipe;
 mod roasting;
+mod sensor;
 mod settings;
 mod sidebar;
 
@@ -25,18 +25,6 @@ pub struct App {
     recipe: Recipe,
     roasting: Roasting,
     settings: Settings,
-}
-
-impl Default for App {
-    fn default() -> Self {
-        App {
-            screen: Screen::default(),
-            sidebar: Sidebar::new(vec![Tab::icon('\u{E801}'), Tab::icon('\u{E800}')], 0),
-            recipe: Recipe::new(),
-            roasting: Roasting::default(),
-            settings: Settings::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -76,23 +64,21 @@ pub enum Message {
 }
 
 impl App {
-    pub fn init() -> (App, Task<Message>) {
+    pub fn boot() -> (App, Task<Message>) {
         let preferences = Preferences::load();
+
+        let (roasting, task) = Roasting::boot();
 
         (
             App {
                 settings: Settings::new(preferences.unwrap()),
-                ..Default::default()
+                screen: Screen::default(),
+                sidebar: Sidebar::new(vec![Tab::icon('\u{E801}'), Tab::icon('\u{E800}')], 0),
+                recipe: Recipe::new(),
+                roasting,
             },
-            Task::none(),
+            task.map(Message::Roasting),
         )
-    }
-
-    pub fn subscription(&self) -> Subscription<Message> {
-        Subscription::batch([
-            event::listen().map(Message::Event),
-            Roasting::subscription(&self.roasting).map(Message::Roasting),
-        ])
     }
 
     pub fn update(app: &mut App, message: Message) -> Task<Message> {
@@ -117,10 +103,7 @@ impl App {
                 app.recipe.update(message);
                 Task::none()
             }
-            Message::Roasting(message) => {
-                app.roasting.update(message);
-                Task::none()
-            }
+            Message::Roasting(message) => app.roasting.update(message).map(Message::Roasting),
             Message::Settings(message) => {
                 app.settings.update(message);
                 Task::none()
