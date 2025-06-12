@@ -73,7 +73,7 @@ impl App {
             App {
                 settings: Settings::new(preferences.unwrap()),
                 screen: Screen::default(),
-                sidebar: Sidebar::new(vec![Tab::icon('\u{E801}'), Tab::icon('\u{E800}')], 0),
+                sidebar: Sidebar::new(vec![Tab::icon('\u{E801}'), Tab::icon('\u{F275}'), Tab::icon('\u{E800}')], 0),
                 recipe: Recipe::new(),
                 roasting,
             },
