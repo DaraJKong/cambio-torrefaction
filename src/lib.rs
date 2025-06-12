@@ -1,5 +1,5 @@
 use iced::{
-    Element, Event, Task, Theme,
+    Element, Event, Task, Theme, Subscription
     keyboard::{self, key},
     widget::{self, row},
 };
@@ -73,7 +73,14 @@ impl App {
             App {
                 settings: Settings::new(preferences.unwrap()),
                 screen: Screen::default(),
-                sidebar: Sidebar::new(vec![Tab::icon('\u{E801}'), Tab::icon('\u{F275}'), Tab::icon('\u{E800}')], 0),
+                sidebar: Sidebar::new(
+                    vec![
+                        Tab::icon('\u{E801}'),
+                        Tab::icon('\u{F275}'),
+                        Tab::icon('\u{E800}'),
+                    ],
+                    0,
+                ),
                 recipe: Recipe::new(),
                 roasting,
             },
@@ -123,6 +130,10 @@ impl App {
                 _ => Task::none(),
             },
         }
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        self.roasting.subscription()
     }
 
     pub fn view(app: &App) -> Element<Message> {

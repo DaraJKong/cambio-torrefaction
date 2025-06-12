@@ -18,6 +18,7 @@ pub struct Roasting {
 pub enum Message {
     BeanUpdated(Update),
     ExhaustUpdated(Update),
+    TryReconnect,
 }
 
 impl Roasting {
@@ -50,6 +51,13 @@ impl Roasting {
                 self.exhaust_sensor.update(update);
                 Task::none()
             }
+            Message::TryReconnect => {
+                if self.bean_sensor.state {
+                    
+                }
+                
+                Task::none()
+            }
         }
     }
 
@@ -71,6 +79,7 @@ impl Roasting {
 pub enum Update {
     Reading(TempData),
     Disconnected(Result<(), Error>),
+    TryReconnect
 }
 
 #[derive(Debug, Default, Clone)]
@@ -135,6 +144,15 @@ impl TempSensor {
             }
         }
     }
+
+    fn subscription(&self) -> Subscription<Message> {
+        if matches!(self.bean_sensor.state, State::Disconnected | State::Errored) || matches!(self.exhaust_sensor.state, State::Disconnected | State::Errored) {
+            return time::every(milliseconds(100)).map(Message::TryReconnect);
+        }
+
+        Subscription::none()
+    }
+    
 
     fn view(&self) -> Element<Message> {
         let temp = match &self.state {

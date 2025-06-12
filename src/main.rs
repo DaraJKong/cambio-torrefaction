@@ -4,6 +4,7 @@ use iced::window;
 fn main() -> iced::Result {
     iced::application(App::boot, App::update, App::view)
         .title("Cambio Torréfaction")
+        .subscription(App::subscription)
         .theme(App::theme)
         .font(include_bytes!("../assets/fonts/app-icons.ttf"))
         .window(window::Settings {

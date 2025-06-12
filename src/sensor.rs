@@ -1,7 +1,7 @@
 use iced::task::{Straw, sipper};
 
 use std::sync::mpsc;
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 pub use phidget::errors::Error;
 
@@ -33,13 +33,21 @@ pub fn connect_temperature(
 
         let (tx, rx) = mpsc::channel();
 
-        sensor
-            .set_on_temperature_change_handler(move |_, t: f64| {
-                tx.send(t).unwrap();
-            })
-            .unwrap();
+        let tx1 = tx.clone();
+        let tx2 = tx.clone();
 
-        while let Ok(t) = rx.recv() {
+        sensor.set_on_temperature_change_handler(move |_, t: f64| {
+            tx1.send(Some(t)).unwrap();
+        })?;
+
+        // sensor.set_on_attach_handler(move |_| {
+        // })?;
+
+        // sensor.set_on_detach_handler(move |_| {
+        //     tx2.send(None).unwrap();
+        // })?;
+
+        while let Ok(Some(t)) = rx.recv_timeout(Duration::from_secs(5)) {
             temp_data
                 .send(TempData {
                     temp: t,
