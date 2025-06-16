@@ -1,5 +1,5 @@
 use iced::{
-    Element, Event, Task, Theme, Subscription
+    Element, Event, Subscription, Task, Theme,
     keyboard::{self, key},
     widget::{self, row},
 };
@@ -133,7 +133,7 @@ impl App {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        self.roasting.subscription()
+        self.roasting.subscription().map(Message::Roasting)
     }
 
     pub fn view(app: &App) -> Element<Message> {

@@ -1,7 +1,7 @@
 use iced::task::{Straw, sipper};
 
 use std::sync::mpsc;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 pub use phidget::errors::Error;
 

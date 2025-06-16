@@ -1,7 +1,8 @@
 use iced::{
     Alignment, Element,
     Length::Fill,
-    Task, task,
+    Subscription, Task, task,
+    time::{self, milliseconds},
     widget::{column, container, horizontal_space, row, text},
 };
 
@@ -10,63 +11,59 @@ use sensor::{Error, TempData};
 
 #[derive(Clone, Debug)]
 pub struct Roasting {
-    bean_sensor: TempSensor,
-    exhaust_sensor: TempSensor,
+    sensors: Vec<TempSensor>,
+    last_id: usize,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    BeanUpdated(Update),
-    ExhaustUpdated(Update),
-    TryReconnect,
+    SensorUpdated(usize, Update),
 }
 
 impl Roasting {
-    pub fn boot() -> (Self, Task<Message>) {
-        let mut bean_sensor = TempSensor::new("Bean:");
-        let bean_task = bean_sensor.connect(0);
+    pub fn new_sensor(&mut self, label: &str, channel: i32) -> Task<Message> {
+        let id = self.last_id;
+        self.last_id += 1;
+        self.sensors.push(TempSensor::new(id, label, 0, 572104, channel));
+        self.sensors[id].connect()
+    }
 
-        let mut exhaust_sensor = TempSensor::new("Exhaust:");
-        let exhaust_task = exhaust_sensor.connect(1);
+    pub fn boot() -> (Self, Task<Message>) {
+        let mut roasting = Self {
+            sensors: Vec::new(),
+            last_id: 0
+        };
+       
+        let bean_task = roasting.new_sensor("Bean:", 0);
+        let exhaust_task = roasting.new_sensor("Exhaust:", 0);
 
         (
-            Self {
-                bean_sensor,
-                exhaust_sensor,
-            },
+            roasting,
             Task::batch([
-                bean_task.map(Message::BeanUpdated),
-                exhaust_task.map(Message::ExhaustUpdated),
+                bean_task,
+                exhaust_task,
             ]),
         )
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::BeanUpdated(update) => {
-                self.bean_sensor.update(update);
-                Task::none()
-            }
-            Message::ExhaustUpdated(update) => {
-                self.exhaust_sensor.update(update);
-                Task::none()
-            }
-            Message::TryReconnect => {
-                if self.bean_sensor.state {
-                    
-                }
-                
-                Task::none()
+            Message::SensorUpdated(id, update) => {
+                self.sensors[id].update(update)
             }
         }
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        Subscription::batch(self.sensors.iter().map(|s| s.subscription()))
     }
 
     pub fn view(&self) -> Element<Message> {
         let title = text("Roasting").size(30);
 
-        let temperatures = column![self.bean_sensor.view(), self.exhaust_sensor.view()];
+        let sensors = column(self.sensors.iter().map(|s| s.view()));
 
-        let roasting = column![title, temperatures].spacing(20);
+        let roasting = column![title, sensors].spacing(20);
 
         container(roasting.max_width(800).spacing(20))
             .center_x(Fill)
@@ -77,14 +74,18 @@ impl Roasting {
 
 #[derive(Debug, Clone)]
 pub enum Update {
+    TryConnect,
     Reading(TempData),
     Disconnected(Result<(), Error>),
-    TryReconnect
 }
 
 #[derive(Debug, Default, Clone)]
 struct TempSensor {
+    id: usize,
     label: String,
+    hub_port: i32,
+    serial_number: i32,
+    channel: i32,
     state: State,
 }
 
@@ -101,18 +102,22 @@ enum State {
 }
 
 impl TempSensor {
-    fn new(label: &str) -> Self {
+    fn new(id: usize, label: &str, hub_port: i32, serial_number: i32, channel: i32) -> Self {
         Self {
+            id,
             label: label.to_string(),
+            hub_port,
+            serial_number,
+            channel,
             state: State::default(),
         }
     }
 
-    fn connect(&mut self, channel: i32) -> Task<Update> {
+    fn connect(&mut self) -> Task<Message> {
         match self.state {
             State::Created | State::Disconnected | State::Errored(_) => {
                 let (task, handle) = Task::sip(
-                    sensor::connect_temperature(0, 572104, channel),
+                    sensor::connect_temperature(self.hub_port, self.serial_number, self.channel),
                     Update::Reading,
                     Update::Disconnected,
                 )
@@ -123,36 +128,41 @@ impl TempSensor {
                     _task: handle.abort_on_drop(),
                 };
 
-                task
+                task.map(move |update| Message::SensorUpdated(self.id, update))
             }
             State::Connected { .. } => Task::none(),
         }
     }
 
-    fn update(&mut self, update: Update) {
+    fn update(&mut self, update: Update) -> Task<Message> {
         if let State::Connected { temp_data, .. } = &mut self.state {
-            match update {
+            return match update {
                 Update::Reading(t) => {
                     *temp_data = t;
+                    Task::none()
                 }
                 Update::Disconnected(result) => {
                     self.state = match result {
                         Ok(_) => State::Disconnected,
                         Err(error) => State::Errored(error),
                     };
+                    Task::none()
                 }
+                Update::TryConnect => self.connect(),
             }
         }
+
+        Task::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        if matches!(self.bean_sensor.state, State::Disconnected | State::Errored) || matches!(self.exhaust_sensor.state, State::Disconnected | State::Errored) {
-            return time::every(milliseconds(100)).map(Message::TryReconnect);
+        match self.state {
+            State::Disconnected | State::Errored(_) => {
+                time::every(milliseconds(100)).map(|_| Message::SensorUpdated(self.id, Update::TryConnect))
+            }
+            _ => Subscription::none(),
         }
-
-        Subscription::none()
     }
-    
 
     fn view(&self) -> Element<Message> {
         let temp = match &self.state {
