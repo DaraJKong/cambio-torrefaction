@@ -19,23 +19,24 @@ pub struct Roasting {
 #[derive(Debug, Clone)]
 pub enum Message {
     SensorUpdated(usize, Update),
-    TryReconnect(Instant)
+    TryReconnect(Instant),
 }
 
 impl Roasting {
     pub fn new_sensor(&mut self, label: &str, channel: i32) -> Task<Update> {
         let id = self.last_id;
         self.last_id += 1;
-        self.sensors.push(TempSensor::new(id, label, 0, 572104, channel));
+        self.sensors
+            .push(TempSensor::new(id, label, 0, 572104, channel));
         self.sensors[id].connect()
     }
 
     pub fn boot() -> (Self, Task<Message>) {
         let mut roasting = Self {
             sensors: Vec::new(),
-            last_id: 0
+            last_id: 0,
         };
-       
+
         let bean_task = roasting.new_sensor("Bean:", 0);
         let exhaust_task = roasting.new_sensor("Exhaust:", 1);
 
@@ -57,8 +58,10 @@ impl Roasting {
             Message::TryReconnect(_) => {
                 Task::batch(self.sensors.iter_mut().enumerate().map(|(i, s)| {
                     match s.state {
-                        State::Disconnected | State::Errored(_) => s.connect().map(move |update| Message::SensorUpdated(i, update)),
-                        _ => Task::none()
+                        State::Disconnected | State::Errored(_) => s
+                            .connect()
+                            .map(move |update| Message::SensorUpdated(i, update)),
+                        _ => Task::none(),
                     }
                 }))
             }
