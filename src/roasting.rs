@@ -5,6 +5,7 @@ use iced::{
     time::{self, milliseconds},
     widget::{column, container, horizontal_space, row, text},
 };
+use std::time::Instant;
 
 use crate::sensor;
 use sensor::{Error, TempData};
@@ -18,10 +19,11 @@ pub struct Roasting {
 #[derive(Debug, Clone)]
 pub enum Message {
     SensorUpdated(usize, Update),
+    TryReconnect(Instant)
 }
 
 impl Roasting {
-    pub fn new_sensor(&mut self, label: &str, channel: i32) -> Task<Message> {
+    pub fn new_sensor(&mut self, label: &str, channel: i32) -> Task<Update> {
         let id = self.last_id;
         self.last_id += 1;
         self.sensors.push(TempSensor::new(id, label, 0, 572104, channel));
@@ -35,13 +37,13 @@ impl Roasting {
         };
        
         let bean_task = roasting.new_sensor("Bean:", 0);
-        let exhaust_task = roasting.new_sensor("Exhaust:", 0);
+        let exhaust_task = roasting.new_sensor("Exhaust:", 1);
 
         (
             roasting,
             Task::batch([
-                bean_task,
-                exhaust_task,
+                bean_task.map(|update| Message::SensorUpdated(0, update)),
+                exhaust_task.map(|update| Message::SensorUpdated(1, update)),
             ]),
         )
     }
@@ -49,7 +51,16 @@ impl Roasting {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::SensorUpdated(id, update) => {
-                self.sensors[id].update(update)
+                let _ = self.sensors[id].update(update);
+                Task::none()
+            }
+            Message::TryReconnect(_) => {
+                Task::batch(self.sensors.iter_mut().enumerate().map(|(i, s)| {
+                    match s.state {
+                        State::Disconnected | State::Errored(_) => s.connect().map(move |update| Message::SensorUpdated(i, update)),
+                        _ => Task::none()
+                    }
+                }))
             }
         }
     }
@@ -74,7 +85,6 @@ impl Roasting {
 
 #[derive(Debug, Clone)]
 pub enum Update {
-    TryConnect,
     Reading(TempData),
     Disconnected(Result<(), Error>),
 }
@@ -113,7 +123,7 @@ impl TempSensor {
         }
     }
 
-    fn connect(&mut self) -> Task<Message> {
+    fn connect(&mut self) -> Task<Update> {
         match self.state {
             State::Created | State::Disconnected | State::Errored(_) => {
                 let (task, handle) = Task::sip(
@@ -128,15 +138,15 @@ impl TempSensor {
                     _task: handle.abort_on_drop(),
                 };
 
-                task.map(move |update| Message::SensorUpdated(self.id, update))
+                task
             }
             State::Connected { .. } => Task::none(),
         }
     }
 
-    fn update(&mut self, update: Update) -> Task<Message> {
+    fn update(&mut self, update: Update) -> Task<Update> {
         if let State::Connected { temp_data, .. } = &mut self.state {
-            return match update {
+            match update {
                 Update::Reading(t) => {
                     *temp_data = t;
                     Task::none()
@@ -148,17 +158,16 @@ impl TempSensor {
                     };
                     Task::none()
                 }
-                Update::TryConnect => self.connect(),
             }
+        } else {
+            Task::none()
         }
-
-        Task::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
         match self.state {
             State::Disconnected | State::Errored(_) => {
-                time::every(milliseconds(100)).map(|_| Message::SensorUpdated(self.id, Update::TryConnect))
+                time::every(milliseconds(100)).map(Message::TryReconnect)
             }
             _ => Subscription::none(),
         }
