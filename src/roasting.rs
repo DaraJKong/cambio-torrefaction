@@ -5,7 +5,7 @@ use iced::{
     time::{self, milliseconds},
     widget::{
         canvas,
-        canvas::{Program, Frame, Geometry, Path, Stroke},
+        canvas::{Frame, Geometry, Path, Program, Stroke},
         column, container, horizontal_space, row, text,
     },
 };
@@ -85,14 +85,19 @@ impl Roasting {
 
     pub fn view(&self) -> Element<Message> {
         let title = text("Roasting").size(30);
+        let sensors = column(self.sensors.iter().map(|s| s.view()))
+            .max_width(800)
+            .spacing(20);
 
-        let sensors = column(self.sensors.iter().map(|s| s.view()));
+        let canvas = canvas(&self.bean_curve).width(Fill).height(Fill);
 
-        let canvas = canvas(&self.bean_curve);
+        let roasting = column![
+            container(title).center_x(Fill),
+            container(sensors).center_x(Fill),
+            canvas
+        ];
 
-        let roasting = column![title, sensors, canvas].spacing(20);
-
-        container(roasting.max_width(800).spacing(20))
+        container(roasting.spacing(20))
             .center_x(Fill)
             .padding(20)
             .into()
@@ -216,27 +221,51 @@ impl<Message> Program<Message> for RoastCurve {
         &self,
         _state: &(),
         renderer: &Renderer,
-        _theme: &Theme,
+        theme: &Theme,
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
-        let mut frame = Frame::new(renderer, bounds.size());
+        let size = bounds.size();
+        let window = (0., 0., 5. * 60., 230.);
+
+        let mut frame = Frame::new(renderer, size);
 
         let curve = Path::new(|p| {
             let mut points = self.points.iter();
             if let Some(temp_data) = points.next() {
                 let start_time = temp_data.time;
-                p.move_to(Point::new(temp_data.temp as f32, 0.0));
+                p.move_to(Point::new(
+                    (0.0 - window.0) / window.2 * size.width,
+                    (1.0 - (temp_data.temp as f32 - window.1) / window.3) * size.height,
+                ));
                 for temp_data in points {
                     p.line_to(Point::new(
-                        temp_data.temp as f32,
-                        temp_data.time.duration_since(start_time).as_secs() as f32,
+                        (temp_data.time.duration_since(start_time).as_secs() as f32 - window.0)
+                            / window.2
+                            * size.width,
+                        (1.0 - (temp_data.temp as f32 - window.1) / window.3) * size.height,
                     ));
                 }
             }
         });
 
-        frame.stroke(&curve, Stroke::default());
+        frame.stroke(
+            &Path::rectangle(Point::ORIGIN, frame.size()),
+            Stroke {
+                style: iced::widget::canvas::Style::Solid(theme.palette().text),
+                width: 3.0,
+                ..Default::default()
+            },
+        );
+
+        frame.stroke(
+            &curve,
+            Stroke {
+                style: iced::widget::canvas::Style::Solid(theme.palette().primary),
+                width: 3.0,
+                ..Default::default()
+            },
+        );
 
         vec![frame.into_geometry()]
     }
