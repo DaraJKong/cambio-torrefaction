@@ -1,9 +1,13 @@
 use iced::{
     Alignment, Element,
     Length::Fill,
-    Subscription, Task, task,
+    Point, Rectangle, Renderer, Subscription, Task, Theme, mouse,
     time::{self, milliseconds},
-    widget::{column, container, horizontal_space, row, text},
+    widget::{
+        canvas,
+        canvas::{Program, Frame, Geometry, Path, Stroke},
+        column, container, horizontal_space, row, text,
+    },
 };
 use std::time::Instant;
 
@@ -12,6 +16,7 @@ use sensor::{Error, TempData};
 
 #[derive(Clone, Debug)]
 pub struct Roasting {
+    bean_curve: RoastCurve,
     sensors: Vec<TempSensor>,
     last_id: usize,
 }
@@ -33,6 +38,7 @@ impl Roasting {
 
     pub fn boot() -> (Self, Task<Message>) {
         let mut roasting = Self {
+            bean_curve: RoastCurve::default(),
             sensors: Vec::new(),
             last_id: 0,
         };
@@ -53,6 +59,11 @@ impl Roasting {
         match message {
             Message::SensorUpdated(id, update) => {
                 let _ = self.sensors[id].update(update);
+                if id == 0 {
+                    if let State::Connected(temp_data) = &self.sensors[0].state {
+                        self.bean_curve.points.push(temp_data.clone());
+                    }
+                }
                 Task::none()
             }
             Message::TryReconnect(_) => {
@@ -77,7 +88,9 @@ impl Roasting {
 
         let sensors = column(self.sensors.iter().map(|s| s.view()));
 
-        let roasting = column![title, sensors].spacing(20);
+        let canvas = canvas(&self.bean_curve);
+
+        let roasting = column![title, sensors, canvas].spacing(20);
 
         container(roasting.max_width(800).spacing(20))
             .center_x(Fill)
@@ -188,5 +201,43 @@ impl TempSensor {
         .width(200)
         .align_y(Alignment::Center)
         .into()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct RoastCurve {
+    points: Vec<TempData>,
+}
+
+impl<Message> Program<Message> for RoastCurve {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &(),
+        renderer: &Renderer,
+        _theme: &Theme,
+        bounds: Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> Vec<Geometry> {
+        let mut frame = Frame::new(renderer, bounds.size());
+
+        let curve = Path::new(|p| {
+            let mut points = self.points.iter();
+            if let Some(temp_data) = points.next() {
+                let start_time = temp_data.time;
+                p.move_to(Point::new(temp_data.temp as f32, 0.0));
+                for temp_data in points {
+                    p.line_to(Point::new(
+                        temp_data.temp as f32,
+                        temp_data.time.duration_since(start_time).as_secs() as f32,
+                    ));
+                }
+            }
+        });
+
+        frame.stroke(&curve, Stroke::default());
+
+        vec![frame.into_geometry()]
     }
 }
