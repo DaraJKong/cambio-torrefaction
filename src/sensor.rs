@@ -1,7 +1,7 @@
 use iced::task::{Straw, sipper};
 
 use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub use phidget::errors::Error;
 
@@ -11,25 +11,13 @@ pub fn connect_temperature(
     hub_port: i32,
     serial_number: i32,
     channel: i32,
-) -> impl Straw<(), TempData, Error> {
-    sipper(async move |mut temp_data| {
+) -> impl Straw<(), Event, Error> {
+    sipper(async move |mut event| {
         let mut sensor = TemperatureSensor::new();
 
         sensor.set_hub_port(hub_port)?;
         sensor.set_serial_number(serial_number)?;
         sensor.set_channel(channel)?;
-
-        sensor.open_wait(TIMEOUT_DEFAULT)?;
-
-        let _port = sensor.hub_port()?;
-        let t = sensor.temperature()?;
-
-        temp_data
-            .send(TempData {
-                temp: t,
-                time: Instant::now(),
-            })
-            .await;
 
         let (tx, rx) = mpsc::channel();
 
@@ -37,27 +25,40 @@ pub fn connect_temperature(
         let tx2 = tx.clone();
 
         sensor.set_on_temperature_change_handler(move |_, t: f64| {
-            tx1.send(Some(t)).unwrap();
+            tx.send(Event::Change(TempData::new(t))).unwrap();
         })?;
 
-        // sensor.set_on_attach_handler(move |_| {
-        // })?;
+        sensor.set_on_attach_handler(move |_| {
+            tx1.send(Event::Attach).unwrap();
+        })?;
 
-        // sensor.set_on_detach_handler(move |_| {
-        //     tx2.send(None).unwrap();
-        // })?;
+        sensor.set_on_detach_handler(move |_| {
+            tx2.send(Event::Detach).unwrap();
+        })?;
 
-        while let Ok(Some(t)) = rx.recv_timeout(Duration::from_secs(5)) {
-            temp_data
-                .send(TempData {
-                    temp: t,
-                    time: Instant::now(),
-                })
-                .await;
+        sensor.open_wait(TIMEOUT_DEFAULT)?;
+
+        while let Ok(ev) = rx.recv() {
+            match ev {
+                Event::Detach => {
+                    event.send(ev).await;
+                    break;
+                }
+                _ => {
+                    event.send(ev).await;
+                }
+            }
         }
 
         Ok(())
     })
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    Change(TempData),
+    Attach,
+    Detach,
 }
 
 #[derive(Debug, Clone)]
@@ -66,11 +67,17 @@ pub struct TempData {
     pub time: Instant,
 }
 
-impl Default for TempData {
-    fn default() -> Self {
+impl TempData {
+    fn new(temp: f64) -> Self {
         Self {
-            temp: 0.0,
+            temp,
             time: Instant::now(),
         }
+    }
+}
+
+impl Default for TempData {
+    fn default() -> Self {
+        Self::new(0.0)
     }
 }

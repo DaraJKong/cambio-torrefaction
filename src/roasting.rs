@@ -1,9 +1,13 @@
 use iced::{
     Alignment, Element,
     Length::Fill,
-    Subscription, Task, task,
+    Point, Rectangle, Renderer, Subscription, Task, Theme, Color, mouse,
     time::{self, milliseconds},
-    widget::{column, container, horizontal_space, row, text},
+    widget::{
+        canvas,
+        canvas::{Frame, Geometry, Path, Program, Stroke},
+        column, container, horizontal_space, row, text,
+    },
 };
 use std::time::Instant;
 
@@ -13,31 +17,35 @@ use sensor::{Error, TempData};
 #[derive(Clone, Debug)]
 pub struct Roasting {
     sensors: Vec<TempSensor>,
+    curves: Vec<RoastCurve>,
     last_id: usize,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     SensorUpdated(usize, Update),
-    TryReconnect(Instant)
+    TryReconnect(Instant),
 }
 
 impl Roasting {
-    pub fn new_sensor(&mut self, label: &str, channel: i32) -> Task<Update> {
+    pub fn new_sensor(&mut self, name: &str, channel: i32) -> Task<Update> {
         let id = self.last_id;
         self.last_id += 1;
-        self.sensors.push(TempSensor::new(id, label, 0, 572104, channel));
+        self.sensors
+            .push(TempSensor::new(id, name, 0, 572104, channel));
+        self.curves.push(RoastCurve::new(id, |theme| theme.palette().primary));
         self.sensors[id].connect()
     }
 
     pub fn boot() -> (Self, Task<Message>) {
         let mut roasting = Self {
             sensors: Vec::new(),
-            last_id: 0
+            curves: Vec::new(),
+            last_id: 0,
         };
-       
-        let bean_task = roasting.new_sensor("Bean:", 0);
-        let exhaust_task = roasting.new_sensor("Exhaust:", 1);
+
+        let bean_task = roasting.new_sensor("Bean", 0);
+        let exhaust_task = roasting.new_sensor("Exhaust", 1);
 
         (
             roasting,
@@ -52,13 +60,20 @@ impl Roasting {
         match message {
             Message::SensorUpdated(id, update) => {
                 let _ = self.sensors[id].update(update);
+                if id == 0 {
+                    if let State::Connected(temp_data) = &self.sensors[0].state {
+                        self.bean_curve.points.push(temp_data.clone());
+                    }
+                }
                 Task::none()
             }
             Message::TryReconnect(_) => {
                 Task::batch(self.sensors.iter_mut().enumerate().map(|(i, s)| {
                     match s.state {
-                        State::Disconnected | State::Errored(_) => s.connect().map(move |update| Message::SensorUpdated(i, update)),
-                        _ => Task::none()
+                        State::Disconnected | State::Errored(_) => s
+                            .connect()
+                            .map(move |update| Message::SensorUpdated(i, update)),
+                        _ => Task::none(),
                     }
                 }))
             }
@@ -71,12 +86,19 @@ impl Roasting {
 
     pub fn view(&self) -> Element<Message> {
         let title = text("Roasting").size(30);
+        let sensors = column(self.sensors.iter().map(|s| s.view()))
+            .max_width(800)
+            .spacing(20);
 
-        let sensors = column(self.sensors.iter().map(|s| s.view()));
+        let canvas = canvas(&self.bean_curve).width(Fill).height(Fill);
 
-        let roasting = column![title, sensors].spacing(20);
+        let roasting = column![
+            container(title).center_x(Fill),
+            container(sensors).center_x(Fill),
+            canvas
+        ];
 
-        container(roasting.max_width(800).spacing(20))
+        container(roasting.spacing(20))
             .center_x(Fill)
             .padding(20)
             .into()
@@ -85,14 +107,14 @@ impl Roasting {
 
 #[derive(Debug, Clone)]
 pub enum Update {
-    Reading(TempData),
+    EventReceived(sensor::Event),
     Disconnected(Result<(), Error>),
 }
 
 #[derive(Debug, Default, Clone)]
 struct TempSensor {
     id: usize,
-    label: String,
+    name: String,
     hub_port: i32,
     serial_number: i32,
     channel: i32,
@@ -103,19 +125,16 @@ struct TempSensor {
 enum State {
     #[default]
     Created,
-    Connected {
-        temp_data: TempData,
-        _task: task::Handle,
-    },
+    Connected(TempData),
     Disconnected,
     Errored(Error),
 }
 
 impl TempSensor {
-    fn new(id: usize, label: &str, hub_port: i32, serial_number: i32, channel: i32) -> Self {
+    fn new(id: usize, name: &str, hub_port: i32, serial_number: i32, channel: i32) -> Self {
         Self {
             id,
-            label: label.to_string(),
+            name: name.to_string(),
             hub_port,
             serial_number,
             channel,
@@ -125,42 +144,39 @@ impl TempSensor {
 
     fn connect(&mut self) -> Task<Update> {
         match self.state {
-            State::Created | State::Disconnected | State::Errored(_) => {
-                let (task, handle) = Task::sip(
-                    sensor::connect_temperature(self.hub_port, self.serial_number, self.channel),
-                    Update::Reading,
-                    Update::Disconnected,
-                )
-                .abortable();
-
-                self.state = State::Connected {
-                    temp_data: TempData::default(),
-                    _task: handle.abort_on_drop(),
-                };
-
-                task
-            }
-            State::Connected { .. } => Task::none(),
+            State::Created | State::Disconnected | State::Errored(_) => Task::sip(
+                sensor::connect_temperature(self.hub_port, self.serial_number, self.channel),
+                Update::EventReceived,
+                Update::Disconnected,
+            ),
+            State::Connected(_) => Task::none(),
         }
     }
 
     fn update(&mut self, update: Update) -> Task<Update> {
-        if let State::Connected { temp_data, .. } = &mut self.state {
-            match update {
-                Update::Reading(t) => {
-                    *temp_data = t;
+        match update {
+            Update::EventReceived(event) => match event {
+                sensor::Event::Change(td) => {
+                    self.state = State::Connected(td);
                     Task::none()
                 }
-                Update::Disconnected(result) => {
-                    self.state = match result {
-                        Ok(_) => State::Disconnected,
-                        Err(error) => State::Errored(error),
-                    };
+                sensor::Event::Attach => {
+                    println!("Attach: {}", self.name);
                     Task::none()
                 }
+                sensor::Event::Detach => {
+                    println!("Detach: {}", self.name);
+                    self.state = State::Disconnected;
+                    Task::none()
+                }
+            },
+            Update::Disconnected(result) => {
+                self.state = match result {
+                    Ok(_) => State::Disconnected,
+                    Err(error) => State::Errored(error),
+                };
+                Task::none()
             }
-        } else {
-            Task::none()
         }
     }
 
@@ -176,16 +192,94 @@ impl TempSensor {
     fn view(&self) -> Element<Message> {
         let temp = match &self.state {
             State::Created => text("Loading...").style(text::base),
-            State::Connected { temp_data, _task } => {
+            State::Connected(temp_data) => {
                 text(format!("{:.1} °C", temp_data.temp)).style(text::success)
             }
             State::Disconnected => text("Disconnected!").style(text::danger),
             State::Errored(error) => text(format!("Error! {}", error)).style(text::danger),
         };
 
-        row![text(self.label.clone()), horizontal_space(), temp.size(25)]
-            .width(200)
-            .align_y(Alignment::Center)
-            .into()
+        row![
+            text(format!("{}:", self.name)),
+            horizontal_space(),
+            temp.size(25)
+        ]
+        .width(200)
+        .align_y(Alignment::Center)
+        .into()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct RoastCurve {
+    source_id: usize,
+    points: Vec<TempData>,
+    color: impl Fn(Theme) -> Color,
+}
+
+impl RoastCurve {
+    fn new(id: usize, color: impl Fn(Theme) -> Color) -> Self {
+        Self {
+            source_id: id,
+            points: Vec::new(),
+            color
+        }
+    }
+}
+
+impl<Message> Program<Message> for RoastCurve {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &(),
+        renderer: &Renderer,
+        theme: &Theme,
+        bounds: Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> Vec<Geometry> {
+        let size = bounds.size();
+        let window = (0., 0., 5. * 60., 230.);
+
+        let mut frame = Frame::new(renderer, size);
+
+        let curve = Path::new(|p| {
+            let mut points = self.points.iter();
+            if let Some(temp_data) = points.next() {
+                let start_time = temp_data.time;
+                p.move_to(Point::new(
+                    (0.0 - window.0) / window.2 * size.width,
+                    (1.0 - (temp_data.temp as f32 - window.1) / window.3) * size.height,
+                ));
+                for temp_data in points {
+                    p.line_to(Point::new(
+                        (temp_data.time.duration_since(start_time).as_secs() as f32 - window.0)
+                            / window.2
+                            * size.width,
+                        (1.0 - (temp_data.temp as f32 - window.1) / window.3) * size.height,
+                    ));
+                }
+            }
+        });
+
+        frame.stroke(
+            &Path::rectangle(Point::ORIGIN, frame.size()),
+            Stroke {
+                style: iced::widget::canvas::Style::Solid(theme.palette().text),
+                width: 1.0,
+                ..Default::default()
+            },
+        );
+
+        frame.stroke(
+            &curve,
+            Stroke {
+                style: iced::widget::canvas::Style::Solid(self.color(theme)),
+                width: 3.0,
+                ..Default::default()
+            },
+        );
+
+        vec![frame.into_geometry()]
     }
 }
