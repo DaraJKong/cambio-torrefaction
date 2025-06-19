@@ -1,7 +1,7 @@
 use iced::{
     Alignment, Element,
     Length::Fill,
-    Point, Rectangle, Renderer, Subscription, Task, Theme, Color, mouse,
+    Point, Rectangle, Renderer, Subscription, Task, Theme, mouse,
     time::{self, milliseconds},
     widget::{
         canvas,
@@ -16,8 +16,8 @@ use sensor::{Error, TempData};
 
 #[derive(Clone, Debug)]
 pub struct Roasting {
+    bean_curve: RoastCurve,
     sensors: Vec<TempSensor>,
-    curves: Vec<RoastCurve>,
     last_id: usize,
 }
 
@@ -33,14 +33,13 @@ impl Roasting {
         self.last_id += 1;
         self.sensors
             .push(TempSensor::new(id, name, 0, 572104, channel));
-        self.curves.push(RoastCurve::new(id, |theme| theme.palette().primary));
         self.sensors[id].connect()
     }
 
     pub fn boot() -> (Self, Task<Message>) {
         let mut roasting = Self {
+            bean_curve: RoastCurve::default(),
             sensors: Vec::new(),
-            curves: Vec::new(),
             last_id: 0,
         };
 
@@ -212,19 +211,7 @@ impl TempSensor {
 
 #[derive(Debug, Clone, Default)]
 struct RoastCurve {
-    source_id: usize,
     points: Vec<TempData>,
-    color: impl Fn(Theme) -> Color,
-}
-
-impl RoastCurve {
-    fn new(id: usize, color: impl Fn(Theme) -> Color) -> Self {
-        Self {
-            source_id: id,
-            points: Vec::new(),
-            color
-        }
-    }
 }
 
 impl<Message> Program<Message> for RoastCurve {
@@ -266,7 +253,7 @@ impl<Message> Program<Message> for RoastCurve {
             &Path::rectangle(Point::ORIGIN, frame.size()),
             Stroke {
                 style: iced::widget::canvas::Style::Solid(theme.palette().text),
-                width: 1.0,
+                width: 3.0,
                 ..Default::default()
             },
         );
@@ -274,7 +261,7 @@ impl<Message> Program<Message> for RoastCurve {
         frame.stroke(
             &curve,
             Stroke {
-                style: iced::widget::canvas::Style::Solid(self.color(theme)),
+                style: iced::widget::canvas::Style::Solid(theme.palette().primary),
                 width: 3.0,
                 ..Default::default()
             },
