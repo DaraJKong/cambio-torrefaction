@@ -1,7 +1,7 @@
 use iced::{
-    Alignment, Element,
+    Alignment, Color, Element,
     Length::Fill,
-    Point, Rectangle, Renderer, Subscription, Task, Theme, Color, mouse,
+    Point, Rectangle, Renderer, Subscription, Task, Theme, mouse,
     time::{self, milliseconds},
     widget::{
         canvas,
@@ -32,7 +32,7 @@ impl Roasting {
         let id = self.last_id;
         self.last_id += 1;
         self.sensors
-            .push(TempSensor::new(id, name, 0, 572104, channel));
+            .push(TempSensor::new(id, name, 0, 572104, channel, color));
         self.curves.push(RoastCurve::new(id, color));
         self.sensors[id].connect()
     }
@@ -44,7 +44,7 @@ impl Roasting {
             last_id: 0,
         };
 
-        let bean_task = roasting.new_sensor("Bean", 0, Color::from_rgb(0., 0., 1.));
+        let bean_task = roasting.new_sensor("Bean", 0, Color::from_rgb(0., 0.5, 1.));
         let exhaust_task = roasting.new_sensor("Exhaust", 1, Color::from_rgb(1., 0., 0.));
 
         (
@@ -88,7 +88,11 @@ impl Roasting {
             .max_width(800)
             .spacing(20);
 
-        let canvas = column(self.curves.iter().map(|curve| canvas(curve).width(Fill).height(Fill).into()));
+        let canvas = column(
+            self.curves
+                .iter()
+                .map(|curve| canvas(curve).width(Fill).height(Fill).into()),
+        );
 
         let roasting = column![
             container(title).center_x(Fill),
@@ -116,6 +120,7 @@ struct TempSensor {
     hub_port: i32,
     serial_number: i32,
     channel: i32,
+    color: Color,
     state: State,
 }
 
@@ -129,13 +134,21 @@ enum State {
 }
 
 impl TempSensor {
-    fn new(id: usize, name: &str, hub_port: i32, serial_number: i32, channel: i32) -> Self {
+    fn new(
+        id: usize,
+        name: &str,
+        hub_port: i32,
+        serial_number: i32,
+        channel: i32,
+        color: Color,
+    ) -> Self {
         Self {
             id,
             name: name.to_string(),
             hub_port,
             serial_number,
             channel,
+            color,
             state: State::default(),
         }
     }
@@ -198,7 +211,7 @@ impl TempSensor {
         };
 
         row![
-            text(format!("{}:", self.name)),
+            text(format!("{}:", self.name)).color(self.color),
             horizontal_space(),
             temp.size(25)
         ]
@@ -220,7 +233,7 @@ impl RoastCurve {
         Self {
             source_id: id,
             points: Vec::new(),
-            color: color
+            color: color,
         }
     }
 }
