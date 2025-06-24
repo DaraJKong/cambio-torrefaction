@@ -5,7 +5,10 @@ use std::time::Instant;
 
 pub use phidget::errors::Error;
 
-use phidget::{Phidget, TIMEOUT_DEFAULT, devices::TemperatureSensor};
+use phidget::{
+    Phidget, TIMEOUT_DEFAULT,
+    devices::{TemperatureSensor, temperature_sensor::ThermocoupleType},
+};
 
 pub fn connect_temperature(
     hub_port: i32,
@@ -28,7 +31,8 @@ pub fn connect_temperature(
             tx.send(Event::Change(TempData::new(t))).unwrap();
         })?;
 
-        sensor.set_on_attach_handler(move |_| {
+        sensor.set_on_attach_handler(move |s| {
+            s.set_thermocouple_type(ThermocoupleType::TypeJ).unwrap();
             tx1.send(Event::Attach).unwrap();
         })?;
 

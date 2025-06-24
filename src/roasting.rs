@@ -1,5 +1,5 @@
 use iced::{
-    Alignment, Element,
+    Alignment, Color, Element,
     Length::Fill,
     Point, Rectangle, Renderer, Subscription, Task, Theme, mouse,
     time::{self, milliseconds},
@@ -16,8 +16,8 @@ use sensor::{Error, TempData};
 
 #[derive(Clone, Debug)]
 pub struct Roasting {
-    bean_curve: RoastCurve,
     sensors: Vec<TempSensor>,
+    curves: Vec<RoastCurve>,
     last_id: usize,
 }
 
@@ -28,23 +28,24 @@ pub enum Message {
 }
 
 impl Roasting {
-    pub fn new_sensor(&mut self, name: &str, channel: i32) -> Task<Update> {
+    pub fn new_sensor(&mut self, name: &str, channel: i32, color: Color) -> Task<Update> {
         let id = self.last_id;
         self.last_id += 1;
         self.sensors
-            .push(TempSensor::new(id, name, 0, 572104, channel));
+            .push(TempSensor::new(id, name, 0, 572104, channel, color));
+        self.curves.push(RoastCurve::new(id, color));
         self.sensors[id].connect()
     }
 
     pub fn boot() -> (Self, Task<Message>) {
         let mut roasting = Self {
-            bean_curve: RoastCurve::default(),
             sensors: Vec::new(),
+            curves: Vec::new(),
             last_id: 0,
         };
 
-        let bean_task = roasting.new_sensor("Bean", 0);
-        let exhaust_task = roasting.new_sensor("Exhaust", 1);
+        let bean_task = roasting.new_sensor("Bean", 0, Color::from_rgb(0., 0.5, 1.));
+        let exhaust_task = roasting.new_sensor("Exhaust", 1, Color::from_rgb(1., 0., 0.));
 
         (
             roasting,
@@ -59,10 +60,8 @@ impl Roasting {
         match message {
             Message::SensorUpdated(id, update) => {
                 let _ = self.sensors[id].update(update);
-                if id == 0 {
-                    if let State::Connected(temp_data) = &self.sensors[0].state {
-                        self.bean_curve.points.push(temp_data.clone());
-                    }
+                if let State::Connected(temp_data) = &self.sensors[id].state {
+                    self.curves[id].points.push(temp_data.clone());
                 }
                 Task::none()
             }
@@ -89,7 +88,11 @@ impl Roasting {
             .max_width(800)
             .spacing(20);
 
-        let canvas = canvas(&self.bean_curve).width(Fill).height(Fill);
+        let canvas = column(
+            self.curves
+                .iter()
+                .map(|curve| canvas(curve).width(Fill).height(Fill).into()),
+        );
 
         let roasting = column![
             container(title).center_x(Fill),
@@ -117,6 +120,7 @@ struct TempSensor {
     hub_port: i32,
     serial_number: i32,
     channel: i32,
+    color: Color,
     state: State,
 }
 
@@ -130,13 +134,21 @@ enum State {
 }
 
 impl TempSensor {
-    fn new(id: usize, name: &str, hub_port: i32, serial_number: i32, channel: i32) -> Self {
+    fn new(
+        id: usize,
+        name: &str,
+        hub_port: i32,
+        serial_number: i32,
+        channel: i32,
+        color: Color,
+    ) -> Self {
         Self {
             id,
             name: name.to_string(),
             hub_port,
             serial_number,
             channel,
+            color,
             state: State::default(),
         }
     }
@@ -199,7 +211,7 @@ impl TempSensor {
         };
 
         row![
-            text(format!("{}:", self.name)),
+            text(format!("{}:", self.name)).color(self.color),
             horizontal_space(),
             temp.size(25)
         ]
@@ -211,7 +223,19 @@ impl TempSensor {
 
 #[derive(Debug, Clone, Default)]
 struct RoastCurve {
+    source_id: usize,
     points: Vec<TempData>,
+    color: Color,
+}
+
+impl RoastCurve {
+    fn new(id: usize, color: Color) -> Self {
+        Self {
+            source_id: id,
+            points: Vec::new(),
+            color: color,
+        }
+    }
 }
 
 impl<Message> Program<Message> for RoastCurve {
@@ -253,7 +277,7 @@ impl<Message> Program<Message> for RoastCurve {
             &Path::rectangle(Point::ORIGIN, frame.size()),
             Stroke {
                 style: iced::widget::canvas::Style::Solid(theme.palette().text),
-                width: 3.0,
+                width: 1.0,
                 ..Default::default()
             },
         );
@@ -261,7 +285,7 @@ impl<Message> Program<Message> for RoastCurve {
         frame.stroke(
             &curve,
             Stroke {
-                style: iced::widget::canvas::Style::Solid(theme.palette().primary),
+                style: iced::widget::canvas::Style::Solid(self.color),
                 width: 3.0,
                 ..Default::default()
             },
