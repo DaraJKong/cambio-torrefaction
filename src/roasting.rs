@@ -1,7 +1,7 @@
 use iced::{
     Alignment, Color, Element,
     Length::Fill,
-    Point, Rectangle, Renderer, Subscription, Task, Theme, mouse,
+    Size, Point, Rectangle, Renderer, Subscription, Task, Theme, mouse,
     time::{self, milliseconds},
     widget::{
         canvas,
@@ -221,24 +221,96 @@ impl TempSensor {
     }
 }
 
+#[derive(Default)]
+enum CurveFit {
+    #[default]
+    Normal,
+    Padding(f32, f32),
+    AlwaysFit(f32, f32)
+}
+
+#[derive(Debug, Clone, Default)]
+struct CurveSettings {
+    min: f32,
+    max: f32,
+    fit: CurveFit,
+}
+
+impl CurveSettings {
+    fn window(&self, min: f32, max: f32) -> (f32, f32) {
+        match self.fit {
+            CurveFit::Normal => (self.min, self.max),
+            CurveFit::Padding(pl, pr) => (
+                self.min.min(min - pl),
+                self.max.max(max - pr),
+            ),
+            CurveFit::AlwaysFit(pl, pr) => (
+                min - pl,
+                max - pr,
+            ),
+        }
+    }
+    
+    fn fit(window: (f32, f32), v: f32, size: f32) -> f32 {
+        (v - window.0) / window.1 * size
+    }
+    
+    fn fit_flip(window: (f32, f32), v: f32, size: f32) -> f32 {
+        (1.0 - (v - window.0) / window.1) * size
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 struct RoastCurve {
     source_id: usize,
     points: Vec<TempData>,
     color: Color,
+    settings: CurveSettings,
 }
 
 impl RoastCurve {
     fn new(id: usize, color: Color) -> Self {
         Self {
             source_id: id,
-            points: Vec::new(),
             color: color,
+            ..Default::default()
         }
+    }
+
+    fn path(&self, start_time: Instant, last_time: Instant, t_settings: CurveSettings, size: Size) -> Path {
+        Path::new(|p| {
+            let min = self.points.iter().reduce(|a, p| f32::min(a, p.temp as f32)).unwrap_or(0.);
+            let max = self.points.iter().reduce(|a, p| f32::max(a, p.temp as f32)).unwrap_or(0.);
+            
+            let mut points = self.points.iter();
+            if let Some(temp_data) = points.next() {
+                let t_window = t_settings.window(0.0, last_time.duration_since(start_time).as_secs() as f32);
+                let v_window = self.settings.window(min, max);
+            
+                p.move_to(Point::new(
+                    self.settings.fit(t_window, temp_data.time.duration_since(self.start_time).as_secs() as f32, size.width),
+                    self.settings.fit(v_window, temp_data.temp as f32, size.height),
+                ));
+            
+                for temp_data in points {
+                    p.line_to(Point::new(
+                        self.settings.fit(t_window, temp_data.time.duration_since(self.start_time).as_secs() as f32, size.width),
+                        self.settings.fit(v_window, temp_data.temp as f32, size.height),
+                    ));
+                }
+            }
+        });
     }
 }
 
-impl<Message> Program<Message> for RoastCurve {
+struct RoastView {
+    start_time: Instant,
+    last_time: Instant,
+    curves: Vec<RoastCurve>,
+    settings: CurveSettings
+}
+
+impl<Message> Program<Message> for RoastView {
     type State = ();
 
     fn draw(
@@ -250,43 +322,27 @@ impl<Message> Program<Message> for RoastCurve {
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
         let size = bounds.size();
-        let window = (0., 0., 5. * 60., 230.);
 
         let mut frame = Frame::new(renderer, size);
 
-        let curve = Path::new(|p| {
-            let mut points = self.points.iter();
-            if let Some(temp_data) = points.next() {
-                let start_time = temp_data.time;
-                p.move_to(Point::new(
-                    (0.0 - window.0) / window.2 * size.width,
-                    (1.0 - (temp_data.temp as f32 - window.1) / window.3) * size.height,
-                ));
-                for temp_data in points {
-                    p.line_to(Point::new(
-                        (temp_data.time.duration_since(start_time).as_secs() as f32 - window.0)
-                            / window.2
-                            * size.width,
-                        (1.0 - (temp_data.temp as f32 - window.1) / window.3) * size.height,
-                    ));
-                }
-            }
-        });
+        for curve in self.curves {
+            let path = curve.path(self.start_time, self.last_time, self.settings, size);
+
+            frame.stroke(
+                &path,
+                Stroke {
+                    style: iced::widget::canvas::Style::Solid(self.color),
+                    width: 3.0,
+                    ..Default::default()
+                },
+            );
+        }
 
         frame.stroke(
             &Path::rectangle(Point::ORIGIN, frame.size()),
             Stroke {
                 style: iced::widget::canvas::Style::Solid(theme.palette().text),
                 width: 1.0,
-                ..Default::default()
-            },
-        );
-
-        frame.stroke(
-            &curve,
-            Stroke {
-                style: iced::widget::canvas::Style::Solid(self.color),
-                width: 3.0,
                 ..Default::default()
             },
         );
