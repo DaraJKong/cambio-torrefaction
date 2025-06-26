@@ -143,12 +143,23 @@ impl Roasting {
         let canvas: Element<_> = if let Some(roast) = &self.roast {
             column![
                 canvas(roast).width(Fill).height(Fill),
-                button("Stop Roast").on_press(Message::StopRoast),
+                container(
+                    button("Stop Roast")
+                        .on_press(Message::StopRoast)
+                        .style(button::danger),
+                )
+                .center_x(Fill)
             ]
             .spacing(20)
             .into()
         } else {
-            button("Start Roast").on_press(Message::StartRoast).into()
+            container(
+                button("Start Roast")
+                    .on_press(Message::StartRoast)
+                    .style(button::success),
+            )
+            .center_x(Fill)
+            .into()
         };
 
         let roasting = column![
@@ -264,7 +275,7 @@ impl TempSensor {
         let temp = match &self.state {
             State::Created => text("Loading...").style(text::base),
             State::Connected(temp_data) => {
-                text(format!("{:.1} °C", temp_data.temp)).style(text::success)
+                text(format!("{:.1} °C", temp_data.temp)).color(self.color)
             }
             State::Disconnected => text("Disconnected!").style(text::danger),
             State::Errored(error) => text(format!("Error! {}", error)).style(text::danger),
