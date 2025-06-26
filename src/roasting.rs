@@ -1,10 +1,10 @@
 use iced::{
     Alignment, Color, Element,
     Length::Fill,
-    Size, Point, Rectangle, Renderer, Subscription, Task, Theme, mouse,
+    Point, Rectangle, Renderer, Size, Subscription, Task, Theme, mouse,
     time::{self, milliseconds},
     widget::{
-        canvas,
+        button, canvas,
         canvas::{Frame, Geometry, Path, Program, Stroke},
         column, container, horizontal_space, row, text,
     },
@@ -17,35 +17,69 @@ use sensor::{Error, TempData};
 #[derive(Clone, Debug)]
 pub struct Roasting {
     sensors: Vec<TempSensor>,
-    curves: Vec<RoastCurve>,
     last_id: usize,
+    roast: Option<Roast>,
+    roasting: bool,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     SensorUpdated(usize, Update),
     TryReconnect(Instant),
+    StartRoast,
+    StopRoast,
 }
 
 impl Roasting {
-    pub fn new_sensor(&mut self, name: &str, channel: i32, color: Color) -> Task<Update> {
+    pub fn new_sensor(
+        &mut self,
+        name: &str,
+        channel: i32,
+        color: Color,
+        curve_settings: CurveSettings,
+    ) -> Task<Update> {
         let id = self.last_id;
         self.last_id += 1;
-        self.sensors
-            .push(TempSensor::new(id, name, 0, 572104, channel, color));
-        self.curves.push(RoastCurve::new(id, color));
+        self.sensors.push(TempSensor::new(
+            id,
+            name,
+            color,
+            curve_settings,
+            0,
+            572104,
+            channel,
+        ));
         self.sensors[id].connect()
     }
 
     pub fn boot() -> (Self, Task<Message>) {
         let mut roasting = Self {
             sensors: Vec::new(),
-            curves: Vec::new(),
             last_id: 0,
+            roast: None,
+            roasting: false,
         };
 
-        let bean_task = roasting.new_sensor("Bean", 0, Color::from_rgb(0., 0.5, 1.));
-        let exhaust_task = roasting.new_sensor("Exhaust", 1, Color::from_rgb(1., 0., 0.));
+        let bean_task = roasting.new_sensor(
+            "Bean",
+            0,
+            Color::from_rgb(0., 0.5, 1.),
+            CurveSettings {
+                min: 0.0,
+                max: 230.0,
+                fit: CurveFit::Normal,
+            },
+        );
+        let exhaust_task = roasting.new_sensor(
+            "Exhaust",
+            1,
+            Color::from_rgb(1., 0., 0.),
+            CurveSettings {
+                min: 0.0,
+                max: 230.0,
+                fit: CurveFit::Normal,
+            },
+        );
 
         (
             roasting,
@@ -61,7 +95,10 @@ impl Roasting {
             Message::SensorUpdated(id, update) => {
                 let _ = self.sensors[id].update(update);
                 if let State::Connected(temp_data) = &self.sensors[id].state {
-                    self.curves[id].points.push(temp_data.clone());
+                    if let Some(roast) = &mut self.roast {
+                        roast.curves[id].points.push(temp_data.clone());
+                        roast.last_time = temp_data.time;
+                    }
                 }
                 Task::none()
             }
@@ -74,6 +111,21 @@ impl Roasting {
                         _ => Task::none(),
                     }
                 }))
+            }
+            Message::StartRoast => {
+                self.roast = Some(Roast::new(
+                    &self.sensors,
+                    CurveSettings {
+                        min: 0.0,
+                        max: 17.0 * 60.0,
+                        fit: CurveFit::Padding(0.0, 10.0),
+                    },
+                ));
+                Task::none()
+            }
+            Message::StopRoast => {
+                self.roast = None;
+                Task::none()
             }
         }
     }
@@ -88,11 +140,16 @@ impl Roasting {
             .max_width(800)
             .spacing(20);
 
-        let canvas = column(
-            self.curves
-                .iter()
-                .map(|curve| canvas(curve).width(Fill).height(Fill).into()),
-        );
+        let canvas: Element<_> = if let Some(roast) = &self.roast {
+            column![
+                canvas(roast).width(Fill).height(Fill),
+                button("Stop Roast").on_press(Message::StopRoast),
+            ]
+            .spacing(20)
+            .into()
+        } else {
+            button("Start Roast").on_press(Message::StartRoast).into()
+        };
 
         let roasting = column![
             container(title).center_x(Fill),
@@ -114,17 +171,6 @@ pub enum Update {
 }
 
 #[derive(Debug, Default, Clone)]
-struct TempSensor {
-    id: usize,
-    name: String,
-    hub_port: i32,
-    serial_number: i32,
-    channel: i32,
-    color: Color,
-    state: State,
-}
-
-#[derive(Debug, Default, Clone)]
 enum State {
     #[default]
     Created,
@@ -133,22 +179,36 @@ enum State {
     Errored(Error),
 }
 
+#[derive(Debug, Clone)]
+struct TempSensor {
+    id: usize,
+    name: String,
+    color: Color,
+    curve_settings: CurveSettings,
+    hub_port: i32,
+    serial_number: i32,
+    channel: i32,
+    state: State,
+}
+
 impl TempSensor {
     fn new(
         id: usize,
         name: &str,
+        color: Color,
+        curve_settings: CurveSettings,
         hub_port: i32,
         serial_number: i32,
         channel: i32,
-        color: Color,
     ) -> Self {
         Self {
             id,
             name: name.to_string(),
+            color,
+            curve_settings,
             hub_port,
             serial_number,
             channel,
-            color,
             state: State::default(),
         }
     }
@@ -221,15 +281,15 @@ impl TempSensor {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 enum CurveFit {
     #[default]
     Normal,
     Padding(f32, f32),
-    AlwaysFit(f32, f32)
+    AlwaysFit(f32, f32),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct CurveSettings {
     min: f32,
     max: f32,
@@ -240,77 +300,105 @@ impl CurveSettings {
     fn window(&self, min: f32, max: f32) -> (f32, f32) {
         match self.fit {
             CurveFit::Normal => (self.min, self.max),
-            CurveFit::Padding(pl, pr) => (
-                self.min.min(min - pl),
-                self.max.max(max - pr),
-            ),
-            CurveFit::AlwaysFit(pl, pr) => (
-                min - pl,
-                max - pr,
-            ),
+            CurveFit::Padding(pl, pr) => (self.min.min(min - pl), self.max.max(max + pr)),
+            CurveFit::AlwaysFit(pl, pr) => (min - pl, max + pr),
         }
     }
-    
+
     fn fit(window: (f32, f32), v: f32, size: f32) -> f32 {
-        (v - window.0) / window.1 * size
+        (v - window.0) / (window.1 - window.0) * size
     }
-    
+
     fn fit_flip(window: (f32, f32), v: f32, size: f32) -> f32 {
-        (1.0 - (v - window.0) / window.1) * size
+        (1.0 - (v - window.0) / (window.1 - window.0)) * size
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct RoastCurve {
     source_id: usize,
-    points: Vec<TempData>,
     color: Color,
     settings: CurveSettings,
+    points: Vec<TempData>,
 }
 
 impl RoastCurve {
-    fn new(id: usize, color: Color) -> Self {
+    fn new(id: usize, color: Color, curve_settings: CurveSettings) -> Self {
         Self {
             source_id: id,
             color: color,
-            ..Default::default()
+            settings: curve_settings,
+            points: Vec::new(),
         }
     }
 
-    fn path(&self, start_time: Instant, last_time: Instant, t_settings: CurveSettings, size: Size) -> Path {
+    fn path(
+        &self,
+        start_time: Instant,
+        last_time: Instant,
+        t_settings: &CurveSettings,
+        size: Size,
+    ) -> Path {
         Path::new(|p| {
-            let min = self.points.iter().reduce(|a, p| f32::min(a, p.temp as f32)).unwrap_or(0.);
-            let max = self.points.iter().reduce(|a, p| f32::max(a, p.temp as f32)).unwrap_or(0.);
-            
+            let iter = self.points.iter().map(|p| p.temp as f32);
+            let min = iter.clone().reduce(f32::min).unwrap_or(0.);
+            let max = iter.reduce(f32::max).unwrap_or(0.);
+
             let mut points = self.points.iter();
             if let Some(temp_data) = points.next() {
-                let t_window = t_settings.window(0.0, last_time.duration_since(start_time).as_secs() as f32);
+                let t_window =
+                    t_settings.window(0.0, last_time.duration_since(start_time).as_secs() as f32);
                 let v_window = self.settings.window(min, max);
-            
+
                 p.move_to(Point::new(
-                    self.settings.fit(t_window, temp_data.time.duration_since(self.start_time).as_secs() as f32, size.width),
-                    self.settings.fit(v_window, temp_data.temp as f32, size.height),
+                    CurveSettings::fit(
+                        t_window,
+                        temp_data.time.duration_since(start_time).as_secs() as f32,
+                        size.width,
+                    ),
+                    CurveSettings::fit_flip(v_window, temp_data.temp as f32, size.height),
                 ));
-            
+
                 for temp_data in points {
                     p.line_to(Point::new(
-                        self.settings.fit(t_window, temp_data.time.duration_since(self.start_time).as_secs() as f32, size.width),
-                        self.settings.fit(v_window, temp_data.temp as f32, size.height),
+                        CurveSettings::fit(
+                            t_window,
+                            temp_data.time.duration_since(start_time).as_secs() as f32,
+                            size.width,
+                        ),
+                        CurveSettings::fit_flip(v_window, temp_data.temp as f32, size.height),
                     ));
                 }
             }
-        });
+        })
     }
 }
 
-struct RoastView {
+#[derive(Clone, Debug)]
+struct Roast {
     start_time: Instant,
     last_time: Instant,
     curves: Vec<RoastCurve>,
-    settings: CurveSettings
+    settings: CurveSettings,
 }
 
-impl<Message> Program<Message> for RoastView {
+impl Roast {
+    fn new(sensors: &Vec<TempSensor>, curve_settings: CurveSettings) -> Self {
+        let now = Instant::now();
+
+        Self {
+            start_time: now,
+            last_time: now,
+            curves: sensors
+                .iter()
+                .map(|s| RoastCurve::new(s.id, s.color, s.curve_settings.clone()))
+                .collect(),
+            settings: curve_settings,
+        }
+    }
+}
+
+impl<Message> Program<Message> for Roast {
     type State = ();
 
     fn draw(
@@ -325,14 +413,14 @@ impl<Message> Program<Message> for RoastView {
 
         let mut frame = Frame::new(renderer, size);
 
-        for curve in self.curves {
-            let path = curve.path(self.start_time, self.last_time, self.settings, size);
+        for curve in &self.curves {
+            let path = curve.path(self.start_time, self.last_time, &self.settings, size);
 
             frame.stroke(
                 &path,
                 Stroke {
-                    style: iced::widget::canvas::Style::Solid(self.color),
-                    width: 3.0,
+                    style: iced::widget::canvas::Style::Solid(curve.color),
+                    width: 2.5,
                     ..Default::default()
                 },
             );
