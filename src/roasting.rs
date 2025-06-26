@@ -9,9 +9,10 @@ use iced::{
         column, container, horizontal_space, row, text,
     },
 };
-use std::time::Instant;
+use serde::Serialize;
+use std::{fs, time::Instant};
 
-use crate::sensor;
+use crate::{preferences::PROJECT_DIRS, sensor};
 use sensor::{Error, TempData};
 
 #[derive(Clone, Debug)]
@@ -124,6 +125,17 @@ impl Roasting {
                 Task::none()
             }
             Message::StopRoast => {
+                if let Some(roast) = &self.roast {
+                    let mut path = PROJECT_DIRS.data_dir().join("_").to_path_buf();
+                    let now = chrono::offset::Local::now();
+                    let file_name = format!("roast_{}.json", now.format("%d-%m-%Y_%Hh%M"));
+                    path.set_file_name(file_name);
+                    if let Some(parent) = path.parent() {
+                        fs::create_dir_all(parent).unwrap();
+                    }
+                    let raw_roast_data: RawRoastData = roast.into();
+                    fs::write(path, serde_json::to_string(&raw_roast_data).unwrap()).unwrap();
+                }
                 self.roast = None;
                 Task::none()
             }
@@ -447,5 +459,40 @@ impl<Message> Program<Message> for Roast {
         );
 
         vec![frame.into_geometry()]
+    }
+}
+
+#[derive(Serialize)]
+struct RawCurveData {
+    id: usize,
+    points: Vec<(f32, f32)>,
+}
+
+#[derive(Serialize)]
+struct RawRoastData {
+    data: Vec<RawCurveData>,
+}
+
+impl From<&Roast> for RawRoastData {
+    fn from(item: &Roast) -> Self {
+        Self {
+            data: item
+                .curves
+                .iter()
+                .map(|c| RawCurveData {
+                    id: c.source_id,
+                    points: c
+                        .points
+                        .iter()
+                        .map(|temp_data| {
+                            (
+                                temp_data.temp as f32,
+                                temp_data.time.duration_since(item.start_time).as_secs() as f32,
+                            )
+                        })
+                        .collect(),
+                })
+                .collect(),
+        }
     }
 }
